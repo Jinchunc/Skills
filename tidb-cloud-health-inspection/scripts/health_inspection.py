@@ -275,14 +275,13 @@ def _collect_workload(api: ClinicAPI, cluster_id: str, args: argparse.Namespace,
 # of references/dedicated-migration-plan.md). Their native result overrides the
 # monolith's bound result (guardrail-verified to the same shape). Reversible:
 # shrink this set to roll back a check to the monolith.
-NATIVE_DEDICATED_ADAPTER_CHECKS = ("TIDB-01", "TIDB-02",
-                                   "TIKV-01", "TIKV-02", "TIKV-03", "TIKV-04",
-                                   "TIKV-05", "TIKV-06", "TIKV-07", "TIKV-08",
-                                   "TIKV-09", "TIKV-10",
-                                   "AVL-01", "AVL-02", "AVL-08",
-                                   "CDC-01", "CDC-02",
-                                   "INF-03", "INF-04", "INF-05", "PD-03",
-                                   "OVR-01", "OVR-02")
+def native_dedicated_checks() -> tuple[str, ...]:
+    """Dedicated checks the native recipe/adapter layer owns (overriding the monolith
+    binding) — data-driven: every recipe in ``config/collection.v1.json`` flagged
+    ``"dedicated_native": true``. Adding a native Dedicated check needs no code change,
+    only its recipe + that flag. The env var NATIVE_DEDICATED_ADAPTER_CHECKS still
+    overrides this at runtime (empty = pure monolith) for the golden guardrail."""
+    return tuple(cid for cid, recipe in load_recipes().items() if recipe.get("dedicated_native"))
 
 
 def _resolve_disk_device_regex(api: ClinicAPI, cluster_id: str) -> str:
@@ -399,12 +398,13 @@ def collect_full_stack(
         # native-primary and add-based: native wins for the checks it owns, and the
         # monolith's binding fills any check native did not produce (robust to a
         # per-check native gap, not only a whole-run failure).
-        # The native set is the default tuple unless NATIVE_DEDICATED_ADAPTER_CHECKS is
-        # set in the environment — a comma list (empty = pure monolith) — which lets the
-        # golden guardrail capture a same-window monolith baseline without a code edit.
+        # The native set is data-driven (recipes flagged dedicated_native, via
+        # native_dedicated_checks()) unless NATIVE_DEDICATED_ADAPTER_CHECKS is set in the
+        # environment — a comma list (empty = pure monolith) — which lets the golden
+        # guardrail capture a same-window monolith baseline without a code edit.
         _env_native = os.environ.get("NATIVE_DEDICATED_ADAPTER_CHECKS")
         _native_set = ([c.strip() for c in _env_native.split(",") if c.strip()]
-                       if _env_native is not None else list(NATIVE_DEDICATED_ADAPTER_CHECKS))
+                       if _env_native is not None else list(native_dedicated_checks()))
         native_ids = [c for c in _native_set if c in selected_ids]
         if native_ids:
             try:

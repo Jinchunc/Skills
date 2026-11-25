@@ -98,6 +98,12 @@ TIDB-01/02    TIKV-01/02/03/04/05/06/07/08/09/10
      （清单 §3 标 `✅*`）。**建议**：收口 binding 前，在带 changefeed 集群补一次 CDC 活跃路径护栏去星。
      **当前 NATIVE 集合 23 个（全覆盖）**。14 条新单测，全量 194 测试绿；`collection_adapters.py validate` → 44 recipes / 19 rules。
 
+   - ✅ **NATIVE 集合改为数据驱动（2026-11-25）**：去掉 `health_inspection.NATIVE_DEDICATED_ADAPTER_CHECKS` 硬编码元组，
+     改为在 `config/collection.v1.json` 的 recipe 顶层打 `"dedicated_native": true` 标志，`native_dedicated_checks()`
+     从 recipe 读取。**加一个 native Dedicated check 不再改代码**——加 recipe + 置标志即可，与 checklist 的
+     `applicability` 数据驱动选集同一思路。env 开关 `NATIVE_DEDICATED_ADAPTER_CHECKS`（空=纯巨石）仍可运行时覆盖供护栏用。
+     派生集合与原 23 项完全一致,护栏零硬差异。
+
    这些就是 by-instance 聚合，和 shared 的 `promql_distribution` 最像；再 CDC-01/02（changefeed 状态/滞后）、
    AVL-01/02/08（可用性/重启/拓扑）、TIKV-03..10（吞吐/稳定性/错误信号/响应性等）。
    每搬一个：把巨石里的 PromQL 抄进 recipe、接通用或新 adapter、`dedicated_binding` 里该 check 改为"已原生采集、

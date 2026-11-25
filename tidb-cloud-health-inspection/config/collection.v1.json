@@ -32,6 +32,7 @@
     },
     "OVR-01": {
       "adapter": "metadata_fields",
+      "dedicated_native": true,
       "params": {
         "fields": [
           "provider",
@@ -45,6 +46,7 @@
     },
     "OVR-02": {
       "adapter": "metadata_fields",
+      "dedicated_native": true,
       "params": {
         "fields": [
           "status"
@@ -189,6 +191,7 @@
     },
     "AVL-01": {
       "adapter": "product_status_check",
+      "dedicated_native": true,
       "params": {
         "field": "status",
         "healthy_reason": "product_available",
@@ -198,6 +201,7 @@
     },
     "TIKV-01": {
       "adapter": "per_instance_vector",
+      "dedicated_native": true,
       "params": {
         "query": "max_over_time((((sum by (instance)(rate(process_cpu_seconds_total{component=\"tikv\"}[5m])))/(sum by (instance)(tikv_server_cpu_cores_quota)))*100)[{window}:5m])",
         "evidence_key": "cpu_max_by_instance",
@@ -208,6 +212,7 @@
     },
     "TIDB-02": {
       "adapter": "per_instance_vector",
+      "dedicated_native": true,
       "params": {
         "query": "max_over_time((process_resident_memory_bytes{component=\"tidb\"})[{window}:5m])",
         "evidence_key": "tidb_memory_max_by_instance",
@@ -218,6 +223,7 @@
     },
     "TIDB-01": {
       "adapter": "per_instance_vector",
+      "dedicated_native": true,
       "params": {
         "query": "max_over_time((((sum by (instance)(rate(process_cpu_seconds_total{component=\"tidb\"}[5m])))/(sum by (instance)(tidb_server_maxprocs)))*100)[{window}:5m])",
         "evidence_key": "tidb_cpu_max_by_instance",
@@ -228,6 +234,7 @@
     },
     "TIKV-02": {
       "adapter": "per_instance_vector",
+      "dedicated_native": true,
       "params": {
         "query": "max_over_time(((process_resident_memory_bytes{component=\"tikv\"} / on(instance) tikv_server_memory_quota_bytes) * 100)[{window}:5m])",
         "evidence_key": "memory_max_by_instance",
@@ -238,6 +245,7 @@
     },
     "INF-03": {
       "adapter": "per_instance_vector",
+      "dedicated_native": true,
       "params": {
         "query": "100 * sum by (instance)(tikv_store_size_bytes{type=\"used\"}) / (sum by (instance)(tikv_store_size_bytes{type=\"used\"}) + sum by (instance)(tikv_store_size_bytes{type=\"available\"}))",
         "evidence_key": "store_usage_by_instance",
@@ -248,6 +256,7 @@
     },
     "PD-03": {
       "adapter": "multi_instance_vector",
+      "dedicated_native": true,
       "params": {
         "metrics": [
           {
@@ -265,6 +274,7 @@
     },
     "INF-05": {
       "adapter": "multi_scalar_peak",
+      "dedicated_native": true,
       "params": {
         "metrics": [
           {
@@ -283,6 +293,7 @@
     },
     "INF-04": {
       "adapter": "disk_iops_check",
+      "dedicated_native": true,
       "params": {
         "iops_query": "max by (pod) (max_over_time((sum by (pod) (sum by (pod,device) (((rate(node_disk_reads_completed_total{device=~\"{tikv_disk_device_regex}\"}[5m]) + rate(node_disk_writes_completed_total{device=~\"{tikv_disk_device_regex}\"}[5m]))) * on(instance) group_left(pod) label_replace(kube_pod_info{namespace=\"{namespace}\", pod=~\".*-tikv-.*\"}, \"instance\", \"$1\", \"node\", \"(.*)\"))))[{window}:5m]))",
         "rule": "inf_iops_exceeded",
@@ -292,6 +303,7 @@
     },
     "TIKV-04": {
       "adapter": "multi_scalar_peak",
+      "dedicated_native": true,
       "params": {
         "metrics": [
           {
@@ -310,6 +322,7 @@
     },
     "TIKV-09": {
       "adapter": "multi_scalar_peak",
+      "dedicated_native": true,
       "params": {
         "metrics": [
           {
@@ -340,6 +353,7 @@
     },
     "TIKV-03": {
       "adapter": "per_instance_vector",
+      "dedicated_native": true,
       "params": {
         "query": "avg_over_time((sum by (instance)(rate(tikv_grpc_msg_duration_seconds_count{type=~\"kv_prewrite|kv_commit|coprocessor|kv_get|kv_batch_get|kv_batch_get_command\"}[5m])))[{window}:5m])",
         "evidence_key": "grpc_qps_avg_by_instance",
@@ -350,6 +364,7 @@
     },
     "TIKV-05": {
       "adapter": "multi_scalar_peak",
+      "dedicated_native": true,
       "params": {
         "metrics": [
           {
@@ -373,6 +388,7 @@
     },
     "TIKV-06": {
       "adapter": "scalar_peak_probe",
+      "dedicated_native": true,
       "params": {
         "query": "max(max_over_time((tikv_engine_pending_compaction_bytes)[{window}:5m]))",
         "evidence_key": "compaction_pending_peak",
@@ -384,6 +400,7 @@
     },
     "TIKV-07": {
       "adapter": "scalar_peak_probe",
+      "dedicated_native": true,
       "params": {
         "query": "max_over_time((sum by (instance)(tikv_unified_read_pool_running_tasks{name=\"unified-read-pool\"}))[{window}:5m])",
         "evidence_key": "unified_read_running_tasks_peak",
@@ -394,6 +411,7 @@
     },
     "TIKV-10": {
       "adapter": "per_instance_vector",
+      "dedicated_native": true,
       "params": {
         "query": "changes(process_start_time_seconds{component=\"tikv\"}[{window}])",
         "evidence_key": "restarts_by_instance",
@@ -404,6 +422,7 @@
     },
     "AVL-02": {
       "adapter": "per_instance_vector",
+      "dedicated_native": true,
       "params": {
         "query": "changes(process_start_time_seconds{component=\"tikv\"}[{window}])",
         "evidence_key": "restarts_by_instance",
@@ -414,6 +433,7 @@
     },
     "AVL-08": {
       "adapter": "instance_count_check",
+      "dedicated_native": true,
       "params": {
         "query": "max_over_time((sum by (instance)(rate(process_cpu_seconds_total{component=\"tikv\"}[5m])))[{window}:5m])",
         "evidence_key": "tikv_instance_count",
@@ -425,6 +445,7 @@
     },
     "CDC-01": {
       "adapter": "changefeed_state_check",
+      "dedicated_native": true,
       "params": {
         "query": "ticdc_coordinator_changefeed_state",
         "evidence_key": "changefeed_states",
@@ -433,6 +454,7 @@
     },
     "CDC-02": {
       "adapter": "combined_scalar_threshold",
+      "dedicated_native": true,
       "params": {
         "queries": [
           "max(ticdc_dispatchermanager_checkpoint_ts_lag)",
@@ -446,6 +468,7 @@
     },
     "TIKV-08": {
       "adapter": "tikv_error_signals",
+      "dedicated_native": true,
       "params": {
         "counters": [
           {
