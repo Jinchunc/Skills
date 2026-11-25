@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TiDB Cloud normalized health inspection",
+  "type": "object",
+  "required": [
+    "cluster_id",
+    "cluster_name",
+    "plan",
+    "profile",
+    "target_scope",
+    "window",
+    "registry_version",
+    "status",
+    "confidence",
+    "check_results",
+    "selected_check_ids",
+    "attempted_check_ids",
+    "na_check_ids",
+    "missing_runnable_check_ids",
+    "checklist_complete",
+    "checklist_selection"
+  ],
+  "properties": {
+    "cluster_id": {"type": "string", "minLength": 1},
+    "cluster_name": {"type": "string", "minLength": 1},
+    "plan": {"enum": ["Starter", "Essential", "Premium", "Dedicated", "BYOC", "Unknown"]},
+    "profile": {"const": "health"},
+    "target_scope": {"const": "individual_cluster"},
+    "component": {"type": ["string", "null"]},
+    "registry_version": {"type": "string", "minLength": 1},
+    "window": {
+      "type": "object",
+      "required": ["timezone", "start", "end", "duration_seconds", "step", "aggregation"],
+      "properties": {
+        "timezone": {"const": "UTC"},
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"},
+        "duration_seconds": {"type": "integer", "exclusiveMinimum": 0},
+        "step": {"type": "string", "minLength": 1},
+        "aggregation": {"type": "string", "minLength": 1}
+      }
+    },
+    "status": {"enum": ["HEALTHY", "NOTICE", "WARNING", "CRITICAL", "N/A"]},
+    "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+    "check_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check_id", "status", "reason"],
+        "properties": {
+          "check_id": {"type": "string", "minLength": 1},
+          "status": {"enum": ["HEALTHY", "NOTICE", "WARNING", "CRITICAL", "N/A"]},
+          "reason": {"type": "string", "minLength": 1},
+          "evidence": {"type": "object"},
+          "registry_mark": {"type": "string"},
+          "implementation": {"type": "object"}
+        }
+      }
+    },
+    "selected_check_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "attempted_check_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "na_check_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "missing_runnable_check_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "checklist_complete": {"type": "boolean"},
+    "checklist_selection": {"type": "object"},
+    "query_errors": {"type": "object"}
+  }
+}

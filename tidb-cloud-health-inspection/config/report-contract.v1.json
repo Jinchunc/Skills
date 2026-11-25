@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.1.0",
+  "contract_version": "2026-11-20.2",
+  "language": "en",
+  "label_policy": "fixed",
+  "supported_outputs": [
+    "markdown",
+    "feishu_wiki",
+    "pdf",
+    "docx"
+  ],
+  "plan_groups": {
+    "logical": [
+      "Starter",
+      "Essential",
+      "Premium"
+    ],
+    "full_stack": [
+      "Dedicated",
+      "BYOC"
+    ]
+  },
+  "status_values": [
+    "HEALTHY",
+    "NOTICE",
+    "WARNING",
+    "CRITICAL",
+    "N/A"
+  ],
+  "confidence_values": [
+    "HIGH",
+    "MEDIUM",
+    "LOW"
+  ],
+  "customer_header": [
+    {"key": "cluster_name", "label": "Cluster Name", "type": "string", "required": true},
+    {"key": "cluster_id", "label": "Cluster ID", "type": "identifier", "required": true},
+    {"key": "plan", "label": "Service Plan", "type": "plan", "required": true},
+    {"key": "provider_region", "label": "Provider / Region", "type": "string_or_na", "required": true},
+    {"key": "tidb_version", "label": "TiDB Version", "type": "string_or_na", "required": true},
+    {"key": "inspection_period", "label": "Inspection Period", "type": "time_window", "required": true},
+    {"key": "report_date", "label": "Report Date", "type": "timestamp", "required": true},
+    {"key": "overall_health_status", "label": "Overall Health Status", "type": "status", "required": true},
+    {"key": "confidence", "label": "Confidence", "type": "confidence", "required": true}
+  ],
+  "internal_audit_fields": [
+    "registry_version",
+    "checklist_signature",
+    "selection",
+    "applicability",
+    "adapter_state",
+    "selected_count",
+    "attempted_count",
+    "evaluated_count",
+    "check_id",
+    "raw_queries",
+    "raw_evidence"
+  ],
+  "logical_health_metrics": [
+    {"key": "qps", "label": "QPS", "unit": "queries/s", "primary": "time_window_p99", "supporting": ["p50", "p95", "p999", "max"]},
+    {"key": "ru_consumption", "label": "RU Consumption", "unit": "RU/s", "primary": "time_window_p99", "supporting": ["p50", "p95", "p999", "max", "exact_window_total"]},
+    {"key": "query_latency_p99", "label": "Query Duration — request P99 series", "unit": "duration", "primary": "time_window_p99", "supporting": ["p50", "p95", "p999", "max"]},
+    {"key": "query_latency_p999", "label": "Query Duration — request P999 series", "unit": "duration", "primary": "time_window_p99", "supporting": ["p50", "p95", "p999", "max"], "role": "supplementary_extreme_tail"},
+    {"key": "failed_sql_ratio", "label": "SQL Failure Ratio", "unit": "%", "primary": "window_average_ratio", "supporting": ["estimated_failure_count"]},
+    {"key": "request_wait_p99", "label": "Resource-control Request Wait — request P99 series", "unit": "duration", "primary": "time_window_p99", "supporting": ["p50", "p95", "p999", "max"]}
+  ],
+  "customer_sections": [
+    "Inspection Metadata",
+    "Executive Summary",
+    "Core Health Metrics",
+    "Findings",
+    "Inspection Coverage",
+    "Scope and N/A Notes"
+  ],
+  "fixed_table_labels": {
+    "core_health_metrics": ["Metric", "Primary P99", "Supporting Distribution"],
+    "finding": ["Finding", "Status", "Primary Observation", "Impact", "Recommended Action"],
+    "action": ["Priority", "Action", "Evidence", "Owner", "Target Date", "Validation", "Status"]
+  },
+  "value_rules": {
+    "canonical_numeric_storage": "Store unscaled numeric values in internal evidence; formatting is presentation-only.",
+    "percentile_priority": "P99 is the primary analysis and display value for QPS, RU, request-duration and wait-time distributions. P50 and P95 are baseline context. P999 and Max are supplementary tail or peak signals. Time-window percentiles use the linear R-7 interpolation method.",
+    "percentile_semantics": "Always distinguish the percentile represented by each sample from the percentile across the inspection time window, for example: request-latency P99 series; 7-day time-window P99.",
+    "counts": "Display as integers with thousands separators; do not abbreviate.",
+    "rates": "Display two decimal places and an explicit per-second unit.",
+    "percentages": "Display at least two decimal places; retain additional precision when a small non-zero ratio would otherwise display as zero.",
+    "durations": "Display with two decimals using one unit chosen by magnitude. Preserve seconds in internal evidence.",
+    "bytes": "Display binary IEC units with two decimals. Preserve bytes in internal evidence.",
+    "ru_rcu": "RU consumption is a rate in RU/s and an exact counter increase for the window. RCU is configured capacity. Never label RU/s as RCU.",
+    "time_window": "Display start and end with explicit UTC offset. Preserve duration, query step and aggregation semantics in internal evidence.",
+    "na": "Use exactly N/A. Never render unavailable, prohibited, not applicable, permission denied, unverified capability or empty evidence as zero or Healthy. Preserve an N/A reason internally.",
+    "identifiers": "Render Cluster ID and full SQL digest as strings without truncation, scientific notation or numeric coercion.",
+    "labels": "Customer section titles, table headers, metric names, capitalization and ordering are immutable across outputs."
+  },
+  "privacy_rules": {
+    "customer_report": "Must not contain checklist IDs, registry metadata, signatures, adapter state, applicability markers, implementation counters, raw PromQL, SQL text, digest lists, Top-N SQL or execution users in the default Health profile.",
+    "logical_scope": "Starter, Essential and Premium customer reports use tenant-scoped logical-cluster evidence only and must not attribute physical nodes, stores, regions, peers, disks, schedulers, Raft, compaction, topology or infrastructure logs to the cluster.",
+    "internal_audit": "Internal artifacts preserve registry selection, check IDs, raw queries, evidence, N/A reasons and deterministic gate state."
+  },
+  "output_rules": {
+    "markdown": "The canonical customer report is Markdown generated from normalized evidence.",
+    "feishu_wiki": "Create from the canonical Markdown without adding internal audit fields.",
+    "pdf": "Render from the same canonical customer model; do not rasterize text tables.",
+    "docx": "Render from the same canonical customer model and preserve heading levels and identifiers as text.",
+    "cross_format": "All customer outputs for the same run must have identical customer-safe labels, values, units, statuses and N/A descriptions."
+  }
+}

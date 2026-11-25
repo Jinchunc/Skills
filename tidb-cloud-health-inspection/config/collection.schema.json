@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pingcap.com/tidb-cloud-health-inspection/collection.v1.json",
+  "title": "Collection recipe registry",
+  "description": "Maps each canonical Check ID to HOW it is collected (adapter + params). Applicability (what is allowed) lives in checklist.v1.json; this file only describes collection. Selection-driven: the collector runs a recipe only for check_ids the registry selected as runnable, so prohibited (X) checks are never collected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "recipes"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "description": {
+      "type": "string"
+    },
+    "recipes": {
+      "type": "object",
+      "description": "Keyed by canonical Check ID (e.g. SQL-01). Every key must exist in checklist.v1.json; cross-validated at load time.",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9]*-[0-9]{2}$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/recipe"
+      }
+    }
+  },
+  "$defs": {
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "params"],
+      "properties": {
+        "adapter": {
+          "type": "string",
+          "description": "Name of a registered adapter in scripts/collection_adapters.py. Generic adapters are config-driven; named adapters carry real logic.",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "params": {
+          "type": "object",
+          "description": "Adapter-specific parameters. Each adapter validates its own params; shapes below are advisory.",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "PromQL template (promql_distribution)."
+            },
+            "numerator": {
+              "type": "string",
+              "description": "PromQL rate for the numerator (promql_ratio)."
+            },
+            "denominator": {
+              "type": "string",
+              "description": "PromQL rate for the denominator (promql_ratio)."
+            },
+            "kind": {
+              "type": "string",
+              "enum": ["range", "instant"],
+              "description": "range -> distribution; instant -> scalar. Default range."
+            },
+            "unit": {
+              "type": "string",
+              "description": "Base unit of the raw value, recorded in evidence."
+            },
+            "scale": {
+              "type": "number",
+              "description": "Multiply the raw value by this before applying the rule and before display (e.g. 1000 for seconds -> ms, 100 for a ratio -> percent). Default 1."
+            },
+            "rule_statistic": {
+              "type": "string",
+              "enum": ["min", "avg", "p50", "p95", "p99", "p999", "max"],
+              "description": "Which distribution statistic feeds the threshold rule (promql_distribution). Default max."
+            },
+            "rule": {
+              "type": "string",
+              "description": "Rule name resolved against config/rules.v1.json (Phase 5). Use \"none\" for observation-only checks (HEALTHY when evidence exists, N/A when empty)."
+            },
+            "fields": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Metadata field names to extract (cluster_metadata)."
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

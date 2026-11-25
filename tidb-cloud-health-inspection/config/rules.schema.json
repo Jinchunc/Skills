@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pingcap.com/tidb-cloud-health-inspection/rules.v1.json",
+  "title": "Threshold and rule registry",
+  "description": "Single source of truth for the numeric knobs that turn a value into a status. Collection recipes reference a rule by name. 'high'/'low' rules are applied directly by apply_rule(); 'params' rules carry arbitrary knobs read by a named adapter that owns its own (sustained-window / correlation) logic.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "rules"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "description": { "type": "string" },
+    "rules": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind", "description"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["high", "low", "params"],
+            "description": "high: larger is worse. low: smaller is worse. params: knobs only, interpreted by a named adapter."
+          },
+          "description": { "type": "string" },
+          "unit": { "type": "string" },
+          "notice": { "type": "number", "description": "Optional. Defaults to 'warning' (no NOTICE band)." },
+          "warning": { "type": "number", "description": "Required for high/low." },
+          "critical": { "type": "number", "description": "Optional. Omit to never escalate to CRITICAL." },
+          "serves": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Check IDs this rule informs; documentation only."
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}

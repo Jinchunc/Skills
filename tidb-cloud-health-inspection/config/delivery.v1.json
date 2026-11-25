@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "_comment": "Feishu/Lark delivery target + layout. BEHAVIOR (templates, grouping) is committed and portable; the ENVIRONMENT-SPECIFIC root token is NOT committed — set it per deployment via the env var named in parent.token_env (preferred) or by filling parent.token locally. Publishing runs through the global lark-cli as the user's own identity.",
+  "feishu": {
+    "identity": "user",
+    "brand": "feishu",
+    "parent": {
+      "type": "wiki",
+      "token": "",
+      "token_env": "FEISHU_PARENT_TOKEN"
+    },
+    "structure": {
+      "group_by_org": true,
+      "org_title_template": "{org}",
+      "doc_title_template": "{cluster_name} 巡检报告 {date}"
+    }
+  }
+}

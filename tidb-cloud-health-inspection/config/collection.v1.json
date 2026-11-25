@@ -1,0 +1,474 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Collection recipes (how to collect each Check ID). Covers the full tenant-safe logical runnable set (Starter/Essential/Premium) plus one dedicated example. Thresholds referenced by name resolve against config/rules.v1.json; recipes with rule=\"none\" are observation-only.",
+  "recipes": {
+    "SCOPE-01": {
+      "adapter": "scope_guard",
+      "params": {}
+    },
+    "SCOPE-02": {
+      "adapter": "scope_guard",
+      "params": {}
+    },
+    "SCOPE-03": {
+      "adapter": "scope_guard",
+      "params": {}
+    },
+    "SCOPE-04": {
+      "adapter": "scope_guard",
+      "params": {}
+    },
+    "SCOPE-05": {
+      "adapter": "scope_guard",
+      "params": {}
+    },
+    "SCOPE-06": {
+      "adapter": "scope_guard",
+      "params": {}
+    },
+    "SCOPE-08": {
+      "adapter": "scope_guard",
+      "params": {}
+    },
+    "OVR-01": {
+      "adapter": "metadata_fields",
+      "params": {
+        "fields": [
+          "provider",
+          "region",
+          "version",
+          "status"
+        ],
+        "healthy_reason": "metadata_resolved",
+        "na_reason": "metadata_unavailable"
+      }
+    },
+    "OVR-02": {
+      "adapter": "metadata_fields",
+      "params": {
+        "fields": [
+          "status"
+        ],
+        "healthy_reason": "product_state_resolved",
+        "na_reason": "state_unavailable"
+      }
+    },
+    "SQL-01": {
+      "adapter": "promql_distribution",
+      "params": {
+        "query": "sum(rate(tidb_server_query_total[5m]))",
+        "kind": "range",
+        "unit": "queries/s",
+        "rule": "none",
+        "retain_series": true
+      }
+    },
+    "SQL-02": {
+      "adapter": "promql_distribution",
+      "params": {
+        "query": "histogram_quantile(0.99, sum(rate(tidb_server_handle_query_duration_seconds_bucket[5m])) by (le))",
+        "kind": "range",
+        "unit": "s",
+        "scale": 1000,
+        "rule_statistic": "max",
+        "rule": "sql_duration_p99_ms",
+        "evidence_key": "statistics_seconds",
+        "retain_series": true
+      }
+    },
+    "SQL-03": {
+      "adapter": "promql_distribution",
+      "params": {
+        "query": "histogram_quantile(0.999, sum(rate(tidb_server_handle_query_duration_seconds_bucket[5m])) by (le))",
+        "kind": "range",
+        "unit": "s",
+        "scale": 1000,
+        "rule_statistic": "max",
+        "rule": "sql_duration_p999_ms",
+        "evidence_key": "statistics_seconds",
+        "retain_series": true
+      }
+    },
+    "SQL-05": {
+      "adapter": "promql_ratio",
+      "params": {
+        "numerator": "sum(rate(tidb_server_execute_error_total[5m]))",
+        "denominator": "sum(rate(tidb_server_query_total[5m]))",
+        "scale": 100,
+        "unit": "%",
+        "rule": "sql_error_ratio_pct",
+        "emit_estimated_count": true
+      }
+    },
+    "SQL-06": {
+      "adapter": "slow_log_count",
+      "params": {
+        "table": "clinic_data_proxy.slow_query_logs",
+        "unit": "rows"
+      }
+    },
+    "SQL-07": {
+      "adapter": "connections_headroom",
+      "params": {
+        "query": "sum(tidb_server_connections)",
+        "unit": "connections",
+        "retain_series": true
+      }
+    },
+    "SQL-08": {
+      "adapter": "promql_distribution",
+      "params": {
+        "query": "sum(tidb_server_tokens)",
+        "kind": "range",
+        "unit": "connections",
+        "rule": "none"
+      }
+    },
+    "SQL-10": {
+      "adapter": "worst_of",
+      "params": {
+        "of": [
+          "SQL-02",
+          "SQL-03",
+          "SQL-05"
+        ]
+      }
+    },
+    "SQLD-01": {
+      "adapter": "sql_topn",
+      "params": {
+        "mode": "ru",
+        "top": 10
+      }
+    },
+    "SQLD-02": {
+      "adapter": "sql_topn",
+      "params": {
+        "mode": "slow_count",
+        "top": 10
+      }
+    },
+    "SQLD-03": {
+      "adapter": "sql_topn",
+      "params": {
+        "mode": "slow_duration",
+        "top": 10
+      }
+    },
+    "RCU-01": {
+      "adapter": "ru_consumption",
+      "params": {
+        "rate_query": "sum(rate(tidb_ruv2_ru_total{tidb_cluster_id=\"{cluster_id}\"}[5m]))",
+        "window_total_query": "sum(increase(tidb_ruv2_ru_total{tidb_cluster_id=\"{cluster_id}\"}[{window}]))",
+        "cross_check_query": "sum(increase(resource_manager_resource_unit_request_unit_v2_sum{tidb_cluster_id=\"{cluster_id}\"}[{window}]))",
+        "unit": "RU/s",
+        "rule": "none",
+        "retain_series": true,
+        "fallback_rate_query": "sum(rate(resource_manager_resource_unit_read_request_unit_sum[5m])) + sum(rate(resource_manager_resource_unit_write_request_unit_sum[5m]))",
+        "fallback_total_query": "sum(increase(resource_manager_resource_unit_read_request_unit_sum[{window}])) + sum(increase(resource_manager_resource_unit_write_request_unit_sum[{window}]))"
+      }
+    },
+    "RCU-05": {
+      "adapter": "promql_distribution",
+      "params": {
+        "query": "histogram_quantile(0.99, sum(rate(resource_manager_client_request_success_bucket[5m])) by (le))",
+        "kind": "range",
+        "unit": "s",
+        "scale": 1,
+        "rule_statistic": "max",
+        "rule": "rc_request_wait_s",
+        "evidence_key": "statistics_seconds"
+      }
+    },
+    "LST-01": {
+      "adapter": "logical_storage_usage",
+      "params": {
+        "query": "sum(avg by(keyspace_id, region_id)(tikv_store_size_bytes{tidb_cluster_id=\"{cluster_id}\", type=\"used\"}))",
+        "unit": "bytes"
+      }
+    },
+    "AVL-01": {
+      "adapter": "product_status_check",
+      "params": {
+        "field": "status",
+        "healthy_reason": "product_available",
+        "warn_reason": "product_status_abnormal",
+        "na_reason": "status_unavailable"
+      }
+    },
+    "TIKV-01": {
+      "adapter": "per_instance_vector",
+      "params": {
+        "query": "max_over_time((((sum by (instance)(rate(process_cpu_seconds_total{component=\"tikv\"}[5m])))/(sum by (instance)(tikv_server_cpu_cores_quota)))*100)[{window}:5m])",
+        "evidence_key": "cpu_max_by_instance",
+        "rule": "tikv_cpu_pct",
+        "healthy_reason": "within_threshold",
+        "na_reason": "cpu_metric_unavailable"
+      }
+    },
+    "TIDB-02": {
+      "adapter": "per_instance_vector",
+      "params": {
+        "query": "max_over_time((process_resident_memory_bytes{component=\"tidb\"})[{window}:5m])",
+        "evidence_key": "tidb_memory_max_by_instance",
+        "rule": "none",
+        "healthy_reason": "tidb_rss_observed",
+        "na_reason": "tidb_memory_metric_unavailable"
+      }
+    },
+    "TIDB-01": {
+      "adapter": "per_instance_vector",
+      "params": {
+        "query": "max_over_time((((sum by (instance)(rate(process_cpu_seconds_total{component=\"tidb\"}[5m])))/(sum by (instance)(tidb_server_maxprocs)))*100)[{window}:5m])",
+        "evidence_key": "tidb_cpu_max_by_instance",
+        "rule": "tidb_cpu_pct",
+        "healthy_reason": "within_threshold",
+        "na_reason": "tidb_cpu_metric_unavailable"
+      }
+    },
+    "TIKV-02": {
+      "adapter": "per_instance_vector",
+      "params": {
+        "query": "max_over_time(((process_resident_memory_bytes{component=\"tikv\"} / on(instance) tikv_server_memory_quota_bytes) * 100)[{window}:5m])",
+        "evidence_key": "memory_max_by_instance",
+        "rule": "tikv_memory_pct",
+        "healthy_reason": "within_threshold",
+        "na_reason": "memory_metric_unavailable"
+      }
+    },
+    "INF-03": {
+      "adapter": "per_instance_vector",
+      "params": {
+        "query": "100 * sum by (instance)(tikv_store_size_bytes{type=\"used\"}) / (sum by (instance)(tikv_store_size_bytes{type=\"used\"}) + sum by (instance)(tikv_store_size_bytes{type=\"available\"}))",
+        "evidence_key": "store_usage_by_instance",
+        "rule": "none",
+        "healthy_reason": "within_threshold",
+        "na_reason": "store_usage_metric_unavailable"
+      }
+    },
+    "PD-03": {
+      "adapter": "multi_instance_vector",
+      "params": {
+        "metrics": [
+          {
+            "evidence_key": "region_by_instance",
+            "query": "sum(tikv_raftstore_region_count{type=\"region\"}) by (instance)"
+          },
+          {
+            "evidence_key": "leader_by_instance",
+            "query": "sum(tikv_raftstore_region_count{type=\"leader\"}) by (instance)"
+          }
+        ],
+        "healthy_reason": "region_distribution_observed",
+        "na_reason": "region_metric_unavailable"
+      }
+    },
+    "INF-05": {
+      "adapter": "multi_scalar_peak",
+      "params": {
+        "metrics": [
+          {
+            "evidence_key": "disk_read_latency_peak",
+            "query": "max by (pod) (max_over_time((max by (pod) (sum by (pod,device) (((rate(node_disk_read_time_seconds_total{device=~\"{tikv_disk_device_regex}\"}[5m]) / rate(node_disk_reads_completed_total{device=~\"{tikv_disk_device_regex}\"}[5m]))) * on(instance) group_left(pod) label_replace(kube_pod_info{namespace=\"{namespace}\", pod=~\".*-tikv-.*\"}, \"instance\", \"$1\", \"node\", \"(.*)\"))))[{window}:5m]))"
+          },
+          {
+            "evidence_key": "disk_write_latency_peak",
+            "query": "max by (pod) (max_over_time((max by (pod) (sum by (pod,device) (((rate(node_disk_write_time_seconds_total{device=~\"{tikv_disk_device_regex}\"}[5m]) / rate(node_disk_writes_completed_total{device=~\"{tikv_disk_device_regex}\"}[5m]))) * on(instance) group_left(pod) label_replace(kube_pod_info{namespace=\"{namespace}\", pod=~\".*-tikv-.*\"}, \"instance\", \"$1\", \"node\", \"(.*)\"))))[{window}:5m]))"
+          }
+        ],
+        "rule": "none",
+        "healthy_reason": "disk_latency_observed",
+        "na_reason": "disk_latency_metric_unavailable"
+      }
+    },
+    "INF-04": {
+      "adapter": "disk_iops_check",
+      "params": {
+        "iops_query": "max by (pod) (max_over_time((sum by (pod) (sum by (pod,device) (((rate(node_disk_reads_completed_total{device=~\"{tikv_disk_device_regex}\"}[5m]) + rate(node_disk_writes_completed_total{device=~\"{tikv_disk_device_regex}\"}[5m]))) * on(instance) group_left(pod) label_replace(kube_pod_info{namespace=\"{namespace}\", pod=~\".*-tikv-.*\"}, \"instance\", \"$1\", \"node\", \"(.*)\"))))[{window}:5m]))",
+        "rule": "inf_iops_exceeded",
+        "healthy_reason": "within_threshold",
+        "na_reason": "disk_io_metric_unavailable"
+      }
+    },
+    "TIKV-04": {
+      "adapter": "multi_scalar_peak",
+      "params": {
+        "metrics": [
+          {
+            "evidence_key": "write_stall_peak",
+            "query": "max(max_over_time((tikv_engine_write_stall)[{window}:5m]))",
+            "key_field": "instance"
+          }
+        ],
+        "warn_if_positive": [
+          "write_stall_peak"
+        ],
+        "warn_reason": "write_stall_observed",
+        "healthy_reason": "no_write_stall",
+        "na_reason": "write_stall_metric_unavailable"
+      }
+    },
+    "TIKV-09": {
+      "adapter": "multi_scalar_peak",
+      "params": {
+        "metrics": [
+          {
+            "evidence_key": "slow_score_peak",
+            "query": "max by (instance) (max_over_time((tikv_raftstore_slow_score)[{window}:5m]))",
+            "key_field": "instance"
+          },
+          {
+            "evidence_key": "raft_log_lag_p99_peak",
+            "query": "max_over_time((histogram_quantile(0.99, sum by (le,instance)(rate(tikv_raftstore_log_lag_bucket[5m]))))[{window}:5m])",
+            "key_field": "instance"
+          }
+        ],
+        "thresholds": [
+          {
+            "key": "slow_score_peak",
+            "rule": "tikv_slow_score"
+          },
+          {
+            "key": "raft_log_lag_p99_peak",
+            "rule": "tikv_raft_log_lag_p99"
+          }
+        ],
+        "warn_reason": "slow_score_or_raft_lag_high",
+        "healthy_reason": "within_threshold",
+        "na_reason": "responsiveness_metric_unavailable"
+      }
+    },
+    "TIKV-03": {
+      "adapter": "per_instance_vector",
+      "params": {
+        "query": "avg_over_time((sum by (instance)(rate(tikv_grpc_msg_duration_seconds_count{type=~\"kv_prewrite|kv_commit|coprocessor|kv_get|kv_batch_get|kv_batch_get_command\"}[5m])))[{window}:5m])",
+        "evidence_key": "grpc_qps_avg_by_instance",
+        "rule": "none",
+        "healthy_reason": "within_threshold",
+        "na_reason": "grpc_metric_unavailable"
+      }
+    },
+    "TIKV-05": {
+      "adapter": "multi_scalar_peak",
+      "params": {
+        "metrics": [
+          {
+            "evidence_key": "scheduler_discard_ratio_peak",
+            "query": "max by (instance) (max_over_time((tikv_scheduler_discard_ratio)[{window}:5m]))",
+            "key_field": "instance"
+          },
+          {
+            "evidence_key": "scheduler_throttle_peak_seconds",
+            "query": "sum by (instance)(increase(tikv_scheduler_throttle_duration_seconds_sum[{window}]))",
+            "key_field": "instance"
+          }
+        ],
+        "warn_if_positive": [
+          "scheduler_discard_ratio_peak"
+        ],
+        "warn_reason": "scheduler_requests_discarded",
+        "healthy_reason": "flow_control_within_range",
+        "na_reason": "flow_control_metric_unavailable"
+      }
+    },
+    "TIKV-06": {
+      "adapter": "scalar_peak_probe",
+      "params": {
+        "query": "max(max_over_time((tikv_engine_pending_compaction_bytes)[{window}:5m]))",
+        "evidence_key": "compaction_pending_peak",
+        "rule": "tikv_compaction_pending_peak",
+        "warn_reason": "compaction_pending_high",
+        "healthy_reason": "within_threshold",
+        "na_reason": "compaction_metric_unavailable"
+      }
+    },
+    "TIKV-07": {
+      "adapter": "scalar_peak_probe",
+      "params": {
+        "query": "max_over_time((sum by (instance)(tikv_unified_read_pool_running_tasks{name=\"unified-read-pool\"}))[{window}:5m])",
+        "evidence_key": "unified_read_running_tasks_peak",
+        "rule": "none",
+        "healthy_reason": "within_threshold",
+        "na_reason": "unified_read_pool_metric_unavailable"
+      }
+    },
+    "TIKV-10": {
+      "adapter": "per_instance_vector",
+      "params": {
+        "query": "changes(process_start_time_seconds{component=\"tikv\"}[{window}])",
+        "evidence_key": "restarts_by_instance",
+        "rule": "restart_count",
+        "healthy_reason": "no_restarts",
+        "na_reason": "restart_metric_unavailable"
+      }
+    },
+    "AVL-02": {
+      "adapter": "per_instance_vector",
+      "params": {
+        "query": "changes(process_start_time_seconds{component=\"tikv\"}[{window}])",
+        "evidence_key": "restarts_by_instance",
+        "rule": "restart_count",
+        "healthy_reason": "no_restarts",
+        "na_reason": "restart_metric_unavailable"
+      }
+    },
+    "AVL-08": {
+      "adapter": "instance_count_check",
+      "params": {
+        "query": "max_over_time((sum by (instance)(rate(process_cpu_seconds_total{component=\"tikv\"}[5m])))[{window}:5m])",
+        "evidence_key": "tikv_instance_count",
+        "min_count": 3,
+        "warn_reason": "single_point_risk",
+        "healthy_reason": "redundant_topology",
+        "na_reason": "topology_metric_unavailable"
+      }
+    },
+    "CDC-01": {
+      "adapter": "changefeed_state_check",
+      "params": {
+        "query": "ticdc_coordinator_changefeed_state",
+        "evidence_key": "changefeed_states",
+        "na_reason": "changefeed_metric_unavailable"
+      }
+    },
+    "CDC-02": {
+      "adapter": "combined_scalar_threshold",
+      "params": {
+        "queries": [
+          "max(ticdc_dispatchermanager_checkpoint_ts_lag)",
+          "max(ticdc_dispatchermanager_resolved_ts_lag)"
+        ],
+        "evidence_key": "cdc_checkpoint_lag_max",
+        "rule": "cdc_checkpoint_lag_s",
+        "reason": "checkpoint_lag",
+        "na_reason": "changefeed_lag_metric_unavailable"
+      }
+    },
+    "TIKV-08": {
+      "adapter": "tikv_error_signals",
+      "params": {
+        "counters": [
+          {
+            "evidence_key": "critical_error_total",
+            "query": "sum(increase(tikv_critical_error_total[{window}]))"
+          },
+          {
+            "evidence_key": "channel_full_total",
+            "query": "sum(increase(tikv_channel_full_total[{window}]))"
+          },
+          {
+            "evidence_key": "server_report_failure_total",
+            "query": "sum(increase(tikv_server_report_failure_msg_total[{window}]))"
+          },
+          {
+            "evidence_key": "grpc_fail_total",
+            "query": "sum(increase(tikv_grpc_msg_fail_total[{window}]))"
+          }
+        ],
+        "loki_limit": 200,
+        "warn_reason": "error_signals_present",
+        "healthy_reason": "no_error_signals"
+      }
+    }
+  }
+}

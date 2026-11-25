@@ -1,0 +1,174 @@
+{
+  "_note": "Dedicated collection shape baseline (status + evidence keys, no raw values). See references/dedicated-migration-plan.md.",
+  "shapes": {
+    "OVR-01": {
+      "status": "HEALTHY",
+      "reason": "metadata_resolved",
+      "evidence_keys": [
+        "provider",
+        "region",
+        "status",
+        "version"
+      ]
+    },
+    "OVR-02": {
+      "status": "HEALTHY",
+      "reason": "product_state_resolved",
+      "evidence_keys": [
+        "status"
+      ]
+    },
+    "TIDB-01": {
+      "status": "HEALTHY",
+      "reason": "within_threshold",
+      "evidence_keys": [
+        "tidb_cpu_max_by_instance"
+      ]
+    },
+    "TIDB-02": {
+      "status": "HEALTHY",
+      "reason": "tidb_rss_observed",
+      "evidence_keys": [
+        "tidb_memory_max_by_instance"
+      ]
+    },
+    "TIKV-01": {
+      "status": "HEALTHY",
+      "reason": "within_threshold",
+      "evidence_keys": [
+        "cpu_max_by_instance"
+      ]
+    },
+    "TIKV-02": {
+      "status": "HEALTHY",
+      "reason": "within_threshold",
+      "evidence_keys": [
+        "memory_max_by_instance"
+      ]
+    },
+    "TIKV-03": {
+      "status": "HEALTHY",
+      "reason": "within_threshold",
+      "evidence_keys": [
+        "grpc_qps_avg_by_instance"
+      ]
+    },
+    "TIKV-04": {
+      "status": "HEALTHY",
+      "reason": "no_write_stall",
+      "evidence_keys": [
+        "write_stall_peak"
+      ]
+    },
+    "TIKV-05": {
+      "status": "HEALTHY",
+      "reason": "flow_control_within_range",
+      "evidence_keys": [
+        "scheduler_discard_ratio_peak",
+        "scheduler_throttle_peak_seconds"
+      ]
+    },
+    "TIKV-06": {
+      "status": "HEALTHY",
+      "reason": "within_threshold",
+      "evidence_keys": []
+    },
+    "TIKV-07": {
+      "status": "HEALTHY",
+      "reason": "within_threshold",
+      "evidence_keys": []
+    },
+    "TIKV-08": {
+      "status": "WARNING",
+      "reason": "error_signals_present",
+      "evidence_keys": [
+        "channel_full_total",
+        "critical_error_total",
+        "error_log_count",
+        "grpc_fail_total",
+        "server_report_failure_total"
+      ]
+    },
+    "TIKV-09": {
+      "status": "HEALTHY",
+      "reason": "within_threshold",
+      "evidence_keys": [
+        "raft_log_lag_p99_peak",
+        "slow_score_peak"
+      ]
+    },
+    "TIKV-10": {
+      "status": "HEALTHY",
+      "reason": "no_restarts",
+      "evidence_keys": [
+        "restarts_by_instance"
+      ]
+    },
+    "PD-03": {
+      "status": "HEALTHY",
+      "reason": "region_distribution_observed",
+      "evidence_keys": [
+        "leader_by_instance",
+        "region_by_instance"
+      ]
+    },
+    "INF-03": {
+      "status": "HEALTHY",
+      "reason": "within_threshold",
+      "evidence_keys": [
+        "store_usage_by_instance"
+      ]
+    },
+    "INF-04": {
+      "status": "HEALTHY",
+      "reason": "within_threshold",
+      "evidence_keys": [
+        "disk_iops_peak",
+        "iops_exceed_peak"
+      ]
+    },
+    "INF-05": {
+      "status": "HEALTHY",
+      "reason": "disk_latency_observed",
+      "evidence_keys": [
+        "disk_read_latency_peak",
+        "disk_write_latency_peak"
+      ]
+    },
+    "AVL-01": {
+      "status": "HEALTHY",
+      "reason": "product_available",
+      "evidence_keys": [
+        "status"
+      ]
+    },
+    "AVL-02": {
+      "status": "HEALTHY",
+      "reason": "no_restarts",
+      "evidence_keys": [
+        "restarts_by_instance"
+      ]
+    },
+    "AVL-08": {
+      "status": "HEALTHY",
+      "reason": "redundant_topology",
+      "evidence_keys": [
+        "tikv_instance_count"
+      ]
+    },
+    "CDC-01": {
+      "status": "HEALTHY",
+      "reason": "all_changefeeds_working",
+      "evidence_keys": [
+        "changefeed_states"
+      ]
+    },
+    "CDC-02": {
+      "status": "HEALTHY",
+      "reason": "checkpoint_lag",
+      "evidence_keys": [
+        "cdc_checkpoint_lag_max"
+      ]
+    }
+  }
+}

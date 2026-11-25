@@ -1,0 +1,19 @@
+{
+  "name": "tidb-cloud-health-inspection",
+  "schedule": {
+    "kind": "cron",
+    "expr": "*/30 * * * *",
+    "tz": "Asia/Shanghai"
+  },
+  "trigger": {
+    "script": "Run the collector, normalize row-level results through scripts/checklist_engine.py with explicit plan/profile/target-scope/capabilities, then run scripts/inspection_gate.py with the same selection inputs. Return fire=true only when the gate result contains llm_required=true; pass only run_id and evidence_bundle to the Agent. Treat registry validation failure, prohibited checks, missing time range, malformed JSON, or any non-zero exit as a failed inspection, not as healthy."
+  },
+  "sessionTarget": "isolated",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "Read the gated evidence bundle. Validate evidence and provide only the required interpretation or escalation. Do not recollect routine healthy metrics."
+  },
+  "delivery": {
+    "mode": "none"
+  }
+}

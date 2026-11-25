@@ -1,0 +1,2720 @@
+{
+  "schema_version": "1.0.0",
+  "registry_version": "2026-11-20.4",
+  "source_of_truth": true,
+  "plans": [
+    "Starter",
+    "Essential",
+    "Premium",
+    "Dedicated",
+    "BYOC",
+    "Unknown"
+  ],
+  "profiles": [
+    "health",
+    "component_deep_dive"
+  ],
+  "target_scopes": [
+    "individual_cluster",
+    "organization"
+  ],
+  "marks": {
+    "R": "required_attempt",
+    "C": "capability_gated",
+    "D": "explicit_deep_dive_only",
+    "X": "prohibited",
+    "—": "not_applicable"
+  },
+  "categories": [
+    {
+      "id": "CAT-00",
+      "title": "Scope and data quality",
+      "purpose": "Validate target, Plan, route, time range, ownership, source coverage, units, and comparison validity",
+      "default_profile_label": "Health",
+      "component": "scope",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-01",
+      "title": "Cluster overview",
+      "purpose": "Product metadata, status, version, provider, region, current configuration, and feature inventory",
+      "default_profile_label": "Health",
+      "component": "overview",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-02",
+      "title": "SQL workload health",
+      "purpose": "Tenant QPS, latency, errors, slow-log aggregates, sessions, and workload anomalies",
+      "default_profile_label": "Health",
+      "component": "sql",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-03",
+      "title": "Resource control",
+      "purpose": "Tenant-safe RU/RCU consumption, capacity, headroom, and queueing",
+      "default_profile_label": "Health",
+      "component": "resource_control",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-04",
+      "title": "Logical storage",
+      "purpose": "Product-exposed logical storage usage, growth, and capacity state",
+      "default_profile_label": "Health",
+      "component": "logical_storage",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-05",
+      "title": "TiDB compute",
+      "purpose": "TiDB process resource and availability signals",
+      "default_profile_label": "Health, full-stack Plans only",
+      "component": "tidb",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-06",
+      "title": "TiKV health",
+      "purpose": "TiKV process, request path, flow control, compaction, and restart signals",
+      "default_profile_label": "Health, full-stack Plans only",
+      "component": "tikv",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-07",
+      "title": "PD and scheduling",
+      "purpose": "PD process, TSO, leader, scheduling, store, Region, and Peer signals",
+      "default_profile_label": "Health, full-stack Plans only",
+      "component": "pd",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-08",
+      "title": "Physical infrastructure",
+      "purpose": "Node, disk, network, filesystem, and cloud-volume signals",
+      "default_profile_label": "Health, full-stack Plans only",
+      "component": "infrastructure",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-09",
+      "title": "Availability and protection",
+      "purpose": "Restarts, topology risk, backup/PITR/changefeed/connectivity and protection state",
+      "default_profile_label": "Health when authorized",
+      "component": "availability",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-10",
+      "title": "TiFlash",
+      "purpose": "TiFlash query, MPP, compute, memory, storage, network, Raft, and pipeline health",
+      "default_profile_label": "Component capability-gated",
+      "component": "tiflash",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-11",
+      "title": "TiCDC",
+      "purpose": "Changefeed status, lag, error, sink and checkpoint evidence",
+      "default_profile_label": "Component capability-gated",
+      "component": "ticdc",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-12",
+      "title": "SQL workload deep dive",
+      "purpose": "SQL Top-N and statement-level diagnostic evidence",
+      "default_profile_label": "Explicit deep dive only",
+      "component": "sql",
+      "target_scope": "individual_cluster"
+    },
+    {
+      "id": "CAT-13",
+      "title": "Organization screening",
+      "purpose": "Paginated inventory and lightweight tenant-safe screening",
+      "default_profile_label": "Organization target only",
+      "component": "organization",
+      "target_scope": "organization"
+    }
+  ],
+  "adapters": {
+    "registry_guard": {
+      "kind": "python",
+      "entrypoint": "scripts/checklist_registry.py",
+      "description": "Scope, Plan, profile and registry validation."
+    },
+    "dedicated_health": {
+      "kind": "python",
+      "entrypoint": "scripts/dedicated_health_inspection.py",
+      "description": "Dedicated/BYOC full-stack collector; row-level binding is partial."
+    },
+    "checklist_engine": {
+      "kind": "python",
+      "entrypoint": "scripts/checklist_engine.py",
+      "description": "Registry-driven time-window validation, row binding, prohibited-result rejection, and explicit N/A synthesis."
+    },
+    "collection_layer": {
+      "kind": "python",
+      "entrypoint": "scripts/collection_adapters.py",
+      "description": "Selection-driven collection layer (recipes in config/collection.v1.json, thresholds in config/rules.v1.json) used by the unified Python runner for tenant-safe Starter/Essential/Premium checks."
+    },
+    "health_inspection": {
+      "kind": "python",
+      "entrypoint": "scripts/health_inspection.py",
+      "description": "Single deterministic inspection, validation, state, and artifact entry point."
+    }
+  },
+  "checks": [
+    {
+      "id": "SCOPE-01",
+      "category": "CAT-00",
+      "title": "Validate required time range and timezone",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "scope",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Reject missing, malformed, non-positive, or reversed range.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "registry_guard",
+          "checklist_engine",
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-02",
+      "category": "CAT-00",
+      "title": "Resolve canonical Plan from source metadata",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "scope",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Preserve raw values only in `sourceMetadata`; Unknown is default-deny.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "registry_guard",
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-03",
+      "category": "CAT-00",
+      "title": "Validate organization ownership and target identity",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "scope",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Route/ownership mismatch is non-zero or N/A, never Healthy.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health",
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-04",
+      "category": "CAT-00",
+      "title": "Validate logical-cluster versus physical-resource-pool record type",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "scope",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Branch and resource-pool records are not logical cluster targets.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "registry_guard",
+          "checklist_engine",
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-05",
+      "category": "CAT-00",
+      "title": "Validate source labels, units, aggregation, and denominator",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "scope",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Unsafe or ambiguous series return N/A.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health",
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-06",
+      "category": "CAT-00",
+      "title": "Record source coverage, sample count, step, and freshness",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "scope",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Insufficient coverage lowers confidence.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health",
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-07",
+      "category": "CAT-00",
+      "title": "Validate previous-period comparability",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "scope",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Compare only matching duration, timezone, dimensions, aggregation, metric definition, and business phase.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SCOPE-08",
+      "category": "CAT-00",
+      "title": "Detect collection, permission, malformed JSON, and timeout failures",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "scope",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Failure remains visible and cannot become zero or Healthy.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "registry_guard",
+          "checklist_engine",
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "OVR-01",
+      "category": "CAT-01",
+      "title": "Cluster name, ID, Plan, status, provider, region, and version",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "overview",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Product metadata.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "collection_layer",
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "OVR-02",
+      "category": "CAT-01",
+      "title": "Active, paused, stopped, deleting, or abnormal product state",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "overview",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Non-active state is reported explicitly.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "OVR-03",
+      "category": "CAT-01",
+      "title": "Current RCU Min/Max or scale configuration",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "overview",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "—",
+        "BYOC": "—"
+      },
+      "capabilities": [
+        "check.ovr-03"
+      ],
+      "notes": "Mark as current configuration when no historical series exists.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "OVR-04",
+      "category": "CAT-01",
+      "title": "Full component topology and instance counts",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "overview",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.ovr-04"
+      ],
+      "notes": "Shared physical topology is excluded for logical-cluster Plans.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "OVR-05",
+      "category": "CAT-01",
+      "title": "Component version consistency",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "overview",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.ovr-05"
+      ],
+      "notes": "Evaluate only for components owned by the target.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "OVR-06",
+      "category": "CAT-01",
+      "title": "Authorized feature inventory",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "overview",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.ovr-06"
+      ],
+      "notes": "Backup, PITR, TiFlash, TiCDC, connectivity and encryption capability state.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SQL-01",
+      "category": "CAT-02",
+      "title": "Query or statement QPS: average, maximum, and trend",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Tenant/logical-cluster scope.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQL-02",
+      "category": "CAT-02",
+      "title": "Query latency P99",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Apply traffic and sample guards.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQL-03",
+      "category": "CAT-02",
+      "title": "Query latency P999",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "N/A when histogram evidence is insufficient.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQL-04",
+      "category": "CAT-02",
+      "title": "Tail spread such as P999/P99",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.sql-04"
+      ],
+      "notes": "Supporting shape signal, not standalone root cause.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SQL-05",
+      "category": "CAT-02",
+      "title": "Failed SQL count and ratio",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Validate denominator and safe error categories.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQL-06",
+      "category": "CAT-02",
+      "title": "Slow-log aggregate count/rate and trend",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Slow-log count is not business request volume; cross-check QPS. Sourced from clinic_data_proxy.slow_query_logs (Data Proxy SQL), validated live.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQL-07",
+      "category": "CAT-02",
+      "title": "Connections and configured limit/headroom",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "N/A when configured limit is unavailable.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQL-08",
+      "category": "CAT-02",
+      "title": "Active sessions and concurrency",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Active connections (sum(tidb_server_tokens), i.e. concurrently executing statements; Max tracks the token-limit). Validated live.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQL-09",
+      "category": "CAT-02",
+      "title": "QPS stability and comparable-window drop/surge",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.sql-09"
+      ],
+      "notes": "Judge change only when comparison is valid.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SQL-10",
+      "category": "CAT-02",
+      "title": "SQL anomaly summary and `deep_dive_recommended`",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Default Health reports signals and reasons, not Top-N rows.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "RCU-01",
+      "category": "CAT-03",
+      "title": "RU/RCU consumption rate and window total",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "resource_control",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "—",
+        "BYOC": "—"
+      },
+      "capabilities": [],
+      "notes": "Tenant-safe product evidence only.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "RCU-02",
+      "category": "CAT-03",
+      "title": "Provisioned RCU capacity",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "resource_control",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "—",
+        "BYOC": "—"
+      },
+      "capabilities": [
+        "check.rcu-02"
+      ],
+      "notes": "Return N/A if the Plan/version does not expose it.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "RCU-03",
+      "category": "CAT-03",
+      "title": "Available RU or headroom",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "resource_control",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "—",
+        "BYOC": "—"
+      },
+      "capabilities": [
+        "check.rcu-03"
+      ],
+      "notes": "Empty series is not healthy headroom.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "RCU-04",
+      "category": "CAT-03",
+      "title": "Read and write RU maximum per second",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "resource_control",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "—",
+        "BYOC": "—"
+      },
+      "capabilities": [
+        "check.rcu-04"
+      ],
+      "notes": "Capability differs by Plan and generation.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "RCU-05",
+      "category": "CAT-03",
+      "title": "Logical-cluster resource-control queueing",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "resource_control",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "R",
+        "Dedicated": "—",
+        "BYOC": "—"
+      },
+      "capabilities": [
+        "check.rcu-05"
+      ],
+      "notes": "Premium uses logical-cluster KV request-wait evidence when exposed.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "RCU-06",
+      "category": "CAT-03",
+      "title": "Slow-query `rc_wait` corroboration",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "resource_control",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "—",
+        "BYOC": "—"
+      },
+      "capabilities": [
+        "check.rcu-06"
+      ],
+      "notes": "Used when metric headroom/queueing evidence is incomplete.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "RCU-07",
+      "category": "CAT-03",
+      "title": "Shared-pool coprocessor wait or pool CPU attribution",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "resource_control",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "—",
+        "BYOC": "—"
+      },
+      "capabilities": [],
+      "notes": "Never query or attribute to one logical cluster in this Skill.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "LST-01",
+      "category": "CAT-04",
+      "title": "Product-exposed logical storage usage",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "logical_storage",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Logical/database storage, not physical store capacity.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "LST-02",
+      "category": "CAT-04",
+      "title": "Storage increase over the selected window",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "logical_storage",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Record absolute change. Depends on a verified logical-storage source (LST-01); renders N/A until that source is bound.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "LST-03",
+      "category": "CAT-04",
+      "title": "Storage growth rate and valid previous-period comparison",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "logical_storage",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.lst-03"
+      ],
+      "notes": "Requires comparable windows. Comparison engine present; depends on a verified logical-storage source (LST-01); renders N/A until that source is bound.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "LST-04",
+      "category": "CAT-04",
+      "title": "Product quota or logical capacity headroom",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "logical_storage",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.lst-04"
+      ],
+      "notes": "N/A when the product does not expose a reliable limit.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TIDB-01",
+      "category": "CAT-05",
+      "title": "TiDB CPU against actual core limit",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tidb",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tidb-01"
+      ],
+      "notes": "Raw cores alone are observation-only.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TIDB-02",
+      "category": "CAT-05",
+      "title": "TiDB RSS against memory limit and trend",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tidb",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tidb-02"
+      ],
+      "notes": "Validate limit source.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TIDB-03",
+      "category": "CAT-05",
+      "title": "TiDB uptime and restart changes",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tidb",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tidb-03"
+      ],
+      "notes": "Per-instance evidence.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TIDB-04",
+      "category": "CAT-05",
+      "title": "TSO wait P99 and PD RPC backoff observed from TiDB",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tidb",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tidb-04"
+      ],
+      "notes": "Logical SQL latency remains in CAT-02 for Shared Plans.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TIDB-05",
+      "category": "CAT-05",
+      "title": "TiDB critical/execute/backoff error families",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tidb",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tidb-05"
+      ],
+      "notes": "Classify reason labels and exclude expected retries where documented.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TIKV-01",
+      "category": "CAT-06",
+      "title": "TiKV CPU and critical thread-pool pressure",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-01"
+      ],
+      "notes": "Per-instance and per-thread evaluation.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "TIKV-02",
+      "category": "CAT-06",
+      "title": "TiKV RSS, block-cache size, and memory trend",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-02"
+      ],
+      "notes": "Requires owned process and capacity evidence.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "TIKV-03",
+      "category": "CAT-06",
+      "title": "TiKV gRPC QPS, P99, failure count, and error ratio",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-03"
+      ],
+      "notes": "Validate request type and denominator.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "TIKV-04",
+      "category": "CAT-06",
+      "title": "Write stall",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-04"
+      ],
+      "notes": "Sustained-window rule.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "TIKV-05",
+      "category": "CAT-06",
+      "title": "Flow-control throttle/discard evidence",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-05"
+      ],
+      "notes": "Correlate with write latency and compaction.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "TIKV-06",
+      "category": "CAT-06",
+      "title": "Pending compaction bytes and L0 file count",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-06"
+      ],
+      "notes": "Per-store or per-instance.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "TIKV-07",
+      "category": "CAT-06",
+      "title": "Unified Read Pool CPU, running tasks, and elapsed time",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-07"
+      ],
+      "notes": "Correlate read-path tails.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "TIKV-08",
+      "category": "CAT-06",
+      "title": "Critical error and server-busy families",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-08"
+      ],
+      "notes": "Hard counters plus persistence semantics.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "TIKV-09",
+      "category": "CAT-06",
+      "title": "Slow score and Raft log lag",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-09"
+      ],
+      "notes": "Supporting risk evidence.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "TIKV-10",
+      "category": "CAT-06",
+      "title": "TiKV restart and version consistency",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tikv",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tikv-10"
+      ],
+      "notes": "Component-owned instances only.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "PD-01",
+      "category": "CAT-07",
+      "title": "PD CPU and memory against limits",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "pd",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.pd-01"
+      ],
+      "notes": "Shared PD is excluded for logical clusters.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "PD-02",
+      "category": "CAT-07",
+      "title": "PD leader/term changes and leader CPU",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "pd",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.pd-02"
+      ],
+      "notes": "Validate election and process signals.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "PD-03",
+      "category": "CAT-07",
+      "title": "Region count and leader distribution balance",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "pd",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.pd-03"
+      ],
+      "notes": "Exclude zero/ghost stores before spread calculations.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "PD-04",
+      "category": "CAT-07",
+      "title": "Region score spread",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "pd",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.pd-04"
+      ],
+      "notes": "Exclude ghost stores and correlate active balancing.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "PD-05",
+      "category": "CAT-07",
+      "title": "Pending peers and unhealthy Regions",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "pd",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.pd-05"
+      ],
+      "notes": "Per-cluster physical evidence.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "PD-06",
+      "category": "CAT-07",
+      "title": "Scheduler activity and pending operators",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "pd",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.pd-06"
+      ],
+      "notes": "Moving/rebalancing state changes interpretation.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "PD-07",
+      "category": "CAT-07",
+      "title": "Store capacity and minimum available ratio",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "pd",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.pd-07"
+      ],
+      "notes": "Physical capacity, never logical storage.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "PD-08",
+      "category": "CAT-07",
+      "title": "GC safe-point lag and physical MVCC growth",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "pd",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.pd-08"
+      ],
+      "notes": "Full-stack source validation required.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "INF-01",
+      "category": "CAT-08",
+      "title": "Node CPU and load pressure",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "infrastructure",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.inf-01"
+      ],
+      "notes": "Owned data-plane nodes only.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "INF-02",
+      "category": "CAT-08",
+      "title": "Node memory and swap pressure",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "infrastructure",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.inf-02"
+      ],
+      "notes": "Validate capacity and OS labels.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "INF-03",
+      "category": "CAT-08",
+      "title": "Physical disk usage and capacity",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "infrastructure",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.inf-03"
+      ],
+      "notes": "Select TiKV data devices from topology.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "INF-04",
+      "category": "CAT-08",
+      "title": "Disk throughput and IOPS",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "infrastructure",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.inf-04"
+      ],
+      "notes": "Align read/write dimensions and aggregation.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "INF-05",
+      "category": "CAT-08",
+      "title": "Disk read/write latency",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "infrastructure",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.inf-05"
+      ],
+      "notes": "Require operation denominator.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "INF-06",
+      "category": "CAT-08",
+      "title": "Disk utilization and queue",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "infrastructure",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.inf-06"
+      ],
+      "notes": "Observation-only unless a verified rule exists.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "INF-07",
+      "category": "CAT-08",
+      "title": "Cloud-volume IOPS/bandwidth exceeded counters",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "infrastructure",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.inf-07"
+      ],
+      "notes": "Cloud/provider capability-gated.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "INF-08",
+      "category": "CAT-08",
+      "title": "Network throughput, drops, errors, and retransmission",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "infrastructure",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.inf-08"
+      ],
+      "notes": "Owned nodes/interfaces only.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "INF-09",
+      "category": "CAT-08",
+      "title": "Filesystem inode and file-descriptor pressure",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "infrastructure",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.inf-09"
+      ],
+      "notes": "Capability-gated.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "AVL-01",
+      "category": "CAT-09",
+      "title": "Product availability/status and recent service events",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "availability",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Product-safe evidence.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "AVL-02",
+      "category": "CAT-09",
+      "title": "Component restart count",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "availability",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.avl-02"
+      ],
+      "notes": "Shared component restarts are excluded.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "AVL-03",
+      "category": "CAT-09",
+      "title": "Instance latency outlier",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "availability",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.avl-03"
+      ],
+      "notes": "Per-instance physical/component signal.",
+      "implementation": {
+        "status": "partial",
+        "adapters": [
+          "dedicated_health"
+        ]
+      }
+    },
+    {
+      "id": "AVL-04",
+      "category": "CAT-09",
+      "title": "Backup policy and latest successful backup",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "availability",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.avl-04"
+      ],
+      "notes": "Only when authorized and supported.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "AVL-05",
+      "category": "CAT-09",
+      "title": "PITR enabled state and recoverability window",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "availability",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.avl-05"
+      ],
+      "notes": "Report product state; do not perform restore.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "AVL-06",
+      "category": "CAT-09",
+      "title": "Connectivity/endpoints and certificate state",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "availability",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.avl-06"
+      ],
+      "notes": "Metadata/control-plane checks only.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "AVL-07",
+      "category": "CAT-09",
+      "title": "Encryption and security quick-scan state",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "availability",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.avl-07"
+      ],
+      "notes": "Stay within granted permissions.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "AVL-08",
+      "category": "CAT-09",
+      "title": "Single-point/topology risk",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "availability",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.avl-08"
+      ],
+      "notes": "Requires verified owned topology.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-01",
+      "category": "CAT-10",
+      "title": "Minimal metric coverage and selector safety",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-01"
+      ],
+      "notes": "Gate all TiFlash domains.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-02",
+      "category": "CAT-10",
+      "title": "Request QPS, error reasons, P99/P999 latency",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-02"
+      ],
+      "notes": "Reason-aware error interpretation.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-03",
+      "category": "CAT-10",
+      "title": "Active handling requests and drain behavior",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-03"
+      ],
+      "notes": "Baseline/trend dependent.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-04",
+      "category": "CAT-10",
+      "title": "MPP query count and longest live task",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-04"
+      ],
+      "notes": "Ignore documented stale artifacts.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-05",
+      "category": "CAT-10",
+      "title": "MPP exchange queueing and throughput",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-05"
+      ],
+      "notes": "Correlation-based escalation.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-06",
+      "category": "CAT-10",
+      "title": "CPU and memory ratios",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-06"
+      ],
+      "notes": "Join independently discovered capacity series.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-07",
+      "category": "CAT-10",
+      "title": "Storage I/O and write-stall domain",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-07"
+      ],
+      "notes": "Domain N/A if required families are absent.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-08",
+      "category": "CAT-10",
+      "title": "Network and proxy report-failure domain",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-08"
+      ],
+      "notes": "Correlate transport errors.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-09",
+      "category": "CAT-10",
+      "title": "Raft wait-index and throughput domain",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-09"
+      ],
+      "notes": "Capability-gated.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "TF-10",
+      "category": "CAT-10",
+      "title": "Pipeline scheduler and task status/duration domain",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "tiflash",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.tf-10"
+      ],
+      "notes": "Capability-gated.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "CDC-01",
+      "category": "CAT-11",
+      "title": "Changefeed inventory and lifecycle status",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "ticdc",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.cdc-01"
+      ],
+      "notes": "Authorized product state.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "CDC-02",
+      "category": "CAT-11",
+      "title": "Checkpoint and resolved-ts lag",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "ticdc",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.cdc-02"
+      ],
+      "notes": "Source/scope capability-gated.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "CDC-03",
+      "category": "CAT-11",
+      "title": "Processor/capture error and exit reason",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "ticdc",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.cdc-03"
+      ],
+      "notes": "Shared physical process evidence excluded.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "CDC-04",
+      "category": "CAT-11",
+      "title": "Sink error and retry signals",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "ticdc",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.cdc-04"
+      ],
+      "notes": "Attribute only to the target changefeed.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "CDC-05",
+      "category": "CAT-11",
+      "title": "Sink throughput and backlog trend",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "ticdc",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.cdc-05"
+      ],
+      "notes": "Validate units and sink dimensions.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "CDC-06",
+      "category": "CAT-11",
+      "title": "Changefeed configuration risk",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "ticdc",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.cdc-06"
+      ],
+      "notes": "Report-only; changes require user approval.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SQLD-01",
+      "category": "CAT-12",
+      "title": "RU Top-N",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Owner-facing RU Top-N: part of the shared-plan Health report (the customer's own SQL). Deep-dive-only for Dedicated/BYOC until the full-stack round.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQLD-02",
+      "category": "CAT-12",
+      "title": "Slow-frequency Top-N",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Owner-facing slow-SQL count Top-N: part of the shared-plan Health report. Deep-dive-only for Dedicated/BYOC until the full-stack round.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQLD-03",
+      "category": "CAT-12",
+      "title": "Total-duration Top-N",
+      "profile": "health",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Owner-facing slow-SQL total-duration Top-N: part of the shared-plan Health report. Deep-dive-only for Dedicated/BYOC until the full-stack round.",
+      "implementation": {
+        "status": "implemented",
+        "adapters": [
+          "collection_layer"
+        ]
+      }
+    },
+    {
+      "id": "SQLD-04",
+      "category": "CAT-12",
+      "title": "Average latency",
+      "profile": "component_deep_dive",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "D",
+        "Essential": "D",
+        "Premium": "D",
+        "Dedicated": "D",
+        "BYOC": "D"
+      },
+      "capabilities": [],
+      "notes": "Include window and sample count.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SQLD-05",
+      "category": "CAT-12",
+      "title": "Execution count",
+      "profile": "component_deep_dive",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "D",
+        "Essential": "D",
+        "Premium": "D",
+        "Dedicated": "D",
+        "BYOC": "D"
+      },
+      "capabilities": [],
+      "notes": "Do not infer business volume from slow-log count alone.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SQLD-06",
+      "category": "CAT-12",
+      "title": "Processed/scanned keys",
+      "profile": "component_deep_dive",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "D",
+        "Essential": "D",
+        "Premium": "D",
+        "Dedicated": "D",
+        "BYOC": "D"
+      },
+      "capabilities": [],
+      "notes": "Logical work, not physical I/O.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SQLD-07",
+      "category": "CAT-12",
+      "title": "Full digest",
+      "profile": "component_deep_dive",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "D",
+        "Essential": "D",
+        "Premium": "D",
+        "Dedicated": "D",
+        "BYOC": "D"
+      },
+      "capabilities": [],
+      "notes": "Never truncate.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SQLD-08",
+      "category": "CAT-12",
+      "title": "Normalized SQL text",
+      "profile": "component_deep_dive",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "D",
+        "Essential": "D",
+        "Premium": "D",
+        "Dedicated": "D",
+        "BYOC": "D"
+      },
+      "capabilities": [],
+      "notes": "Redact schema/table/literals according to audience.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "SQLD-09",
+      "category": "CAT-12",
+      "title": "Execution users",
+      "profile": "component_deep_dive",
+      "target_scope": "individual_cluster",
+      "component": "sql",
+      "applicability": {
+        "Starter": "D",
+        "Essential": "D",
+        "Premium": "D",
+        "Dedicated": "D",
+        "BYOC": "D"
+      },
+      "capabilities": [],
+      "notes": "Redact according to audience.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "ORG-01",
+      "category": "CAT-13",
+      "title": "Paginate cluster inventory to completion",
+      "profile": "health",
+      "target_scope": "organization",
+      "component": "organization",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Record verified and raw counts.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "ORG-02",
+      "category": "CAT-13",
+      "title": "Verify ownership, deduplicate IDs, exclude branch/pool records",
+      "profile": "health",
+      "target_scope": "organization",
+      "component": "organization",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Per-target failure isolation.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "ORG-03",
+      "category": "CAT-13",
+      "title": "Plan/version/provider/region distribution",
+      "profile": "health",
+      "target_scope": "organization",
+      "component": "organization",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Inventory summary.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "ORG-04",
+      "category": "CAT-13",
+      "title": "Lightweight product status and SQL workload screening",
+      "profile": "health",
+      "target_scope": "organization",
+      "component": "organization",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Tenant-safe evidence only.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "ORG-05",
+      "category": "CAT-13",
+      "title": "Lightweight RU/RCU and logical storage screening",
+      "profile": "health",
+      "target_scope": "organization",
+      "component": "organization",
+      "applicability": {
+        "Starter": "C",
+        "Essential": "C",
+        "Premium": "C",
+        "Dedicated": "C",
+        "BYOC": "C"
+      },
+      "capabilities": [
+        "check.org-05"
+      ],
+      "notes": "Capability-gated.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "ORG-06",
+      "category": "CAT-13",
+      "title": "Mark unreachable or unsafe targets with sanitized reason",
+      "profile": "health",
+      "target_scope": "organization",
+      "component": "organization",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Continue the organization run.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "ORG-07",
+      "category": "CAT-13",
+      "title": "Return drill-down targets",
+      "profile": "health",
+      "target_scope": "organization",
+      "component": "organization",
+      "applicability": {
+        "Starter": "R",
+        "Essential": "R",
+        "Premium": "R",
+        "Dedicated": "R",
+        "BYOC": "R"
+      },
+      "capabilities": [],
+      "notes": "Individual inspection requires explicit selection or deterministic gate.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "ORG-08",
+      "category": "CAT-13",
+      "title": "Full physical component catalog for every target",
+      "profile": "health",
+      "target_scope": "organization",
+      "component": "organization",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "X",
+        "BYOC": "X"
+      },
+      "capabilities": [],
+      "notes": "Organization screening intentionally remains lightweight.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    },
+    {
+      "id": "ORG-09",
+      "category": "CAT-13",
+      "title": "SQL Top-N for every target",
+      "profile": "health",
+      "target_scope": "organization",
+      "component": "organization",
+      "applicability": {
+        "Starter": "X",
+        "Essential": "X",
+        "Premium": "X",
+        "Dedicated": "X",
+        "BYOC": "X"
+      },
+      "capabilities": [],
+      "notes": "Explicit individual-cluster deep dive only.",
+      "implementation": {
+        "status": "planned",
+        "adapters": []
+      }
+    }
+  ],
+  "policy": {
+    "unknown_plan": "default_deny",
+    "missing_required_evidence": "N/A",
+    "missing_capability": "N/A",
+    "prohibited_checks_must_not_run": true,
+    "markdown_is_generated": true
+  },
+  "plan_guidance": {
+    "Starter": "Run CAT-00, CAT-01, CAT-02, CAT-03, CAT-04, and authorized product-state checks in CAT-09/CAT-11. Physical categories CAT-05 through CAT-08 and shared physical TiFlash evidence are excluded. Unsupported product evidence is N/A with a reason.",
+    "Essential": "Use the same logical-cluster boundary as Starter. Attempt keyspace-scoped provisioned capacity, available RU, read/write maximum RU, consumption and rc_wait corroboration when exposed. Never use parent-pool physical evidence.",
+    "Premium": "Use the same logical-cluster boundary. Attempt logical-cluster RU/RCU and KV request-wait queueing evidence when exposed. Shared-pool coprocessor wait, TiKV/PD CPU, nodes, storage and topology are excluded.",
+    "Dedicated": "Run tenant SQL and logical storage plus capability-gated full-stack CAT-05 through CAT-11. Every physical rule still requires route, ownership, label, permission, version, unit and source validation.",
+    "BYOC": "Use the Dedicated logical/full-stack category set, but treat cloud-provider and infrastructure evidence as capability-gated because metric ownership and provider integrations vary by deployment.",
+    "Unknown": "Default-deny. Only safe metadata required to explain routing failure may be emitted."
+  },
+  "profile_boundaries": [
+    "Default health evaluates R checks and C checks after capability validation.",
+    "component_deep_dive evaluates only the explicitly requested component/category and does not silently expand scope.",
+    "SQL Top-N checks are D checks and do not determine cluster Health by rank.",
+    "N/A lowers confidence instead of severity.",
+    "Snapshot evidence may supplement but never replace the required observation window.",
+    "A check affects Health only when evidence, unit, denominator, scope, threshold or baseline, and persistence semantics are valid."
+  ]
+}

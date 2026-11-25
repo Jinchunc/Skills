@@ -1,0 +1,26 @@
+# ── Repo-wide guards (each skill may also have its own .gitignore) ──
+
+# Secrets — never commit (API keys, Feishu creds, tokens). Use <skill>/config/env.example.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/config/env.example
+
+# Run artifacts (regenerable)
+**/output/
+*.log
+**/*.log
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+**/.pytest_cache/
+
+# macOS / editor / local junk
+.DS_Store
+**/.DS_Store
+.claude/
+**/.claude/

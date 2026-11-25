@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TiDB Cloud inspection gate result",
+  "type": "object",
+  "required": [
+    "run_id",
+    "target",
+    "inspection",
+    "registry_version",
+    "checklist",
+    "status",
+    "confidence",
+    "changed",
+    "actionable",
+    "llm_required",
+    "fire",
+    "evidence_bundle",
+    "notification_owner"
+  ],
+  "properties": {
+    "run_id": {"type": "string"},
+    "target": {
+      "type": "object",
+      "required": ["id", "plan"],
+      "properties": {
+        "id": {"type": "string"},
+        "plan": {"enum": ["Starter", "Essential", "Premium", "Dedicated", "BYOC", "Unknown"]}
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "required": ["profile", "target_scope"],
+      "properties": {
+        "profile": {"enum": ["health", "component_deep_dive"]},
+        "target_scope": {"enum": ["individual_cluster", "organization"]},
+        "component": {"type": ["string", "null"]}
+      }
+    },
+    "registry_version": {"type": "string"},
+    "checklist": {
+      "type": "object",
+      "required": ["selected_check_ids", "runnable_check_ids", "na_check_ids", "coverage"],
+      "properties": {
+        "selected_check_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "runnable_check_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "na_check_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "coverage": {
+          "type": "object",
+          "required": ["binding", "reported_check_ids", "missing_runnable_check_ids", "complete"],
+          "properties": {
+            "binding": {"enum": ["bound", "unbound"]},
+            "reported_check_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+            "missing_runnable_check_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+            "complete": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "status": {"enum": ["HEALTHY", "NOTICE", "WARNING", "CRITICAL", "N/A"]},
+    "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+    "changed": {"type": "boolean"},
+    "actionable": {"type": "boolean"},
+    "llm_required": {"type": "boolean"},
+    "analysis_reasons": {"type": "array", "items": {"type": "string"}},
+    "fire": {"type": "boolean"},
+    "evidence_bundle": {"type": "string"},
+    "report": {"type": ["string", "null"]},
+    "notification_owner": {"enum": ["python", "agent", "none"]},
+    "state_path": {"type": "string"}
+  }
+}

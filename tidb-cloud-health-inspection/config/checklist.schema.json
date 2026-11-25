@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/tidb-cloud-health-inspection/checklist.schema.json",
+  "title": "TiDB Cloud Health Inspection Checklist Registry",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "registry_version",
+    "source_of_truth",
+    "plans",
+    "profiles",
+    "target_scopes",
+    "marks",
+    "categories",
+    "adapters",
+    "checks",
+    "policy"
+  ],
+  "properties": {
+    "schema_version": {"type": "string", "const": "1.0.0"},
+    "registry_version": {"type": "string", "minLength": 1},
+    "source_of_truth": {"type": "boolean", "const": true},
+    "plans": {
+      "type": "array",
+      "items": {"enum": ["Starter", "Essential", "Premium", "Dedicated", "BYOC", "Unknown"]},
+      "uniqueItems": true,
+      "minItems": 6,
+      "maxItems": 6
+    },
+    "profiles": {
+      "type": "array",
+      "items": {"enum": ["health", "component_deep_dive"]},
+      "uniqueItems": true,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "target_scopes": {
+      "type": "array",
+      "items": {"enum": ["individual_cluster", "organization"]},
+      "uniqueItems": true,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "purpose", "component", "target_scope"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^CAT-[0-9]{2}$"},
+          "title": {"type": "string", "minLength": 1},
+          "purpose": {"type": "string", "minLength": 1},
+          "component": {"type": "string", "minLength": 1},
+          "target_scope": {"enum": ["individual_cluster", "organization"]}
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "title", "profile", "target_scope", "component", "applicability", "capabilities", "notes", "implementation"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"},
+          "category": {"type": "string", "pattern": "^CAT-[0-9]{2}$"},
+          "profile": {"enum": ["health", "component_deep_dive"]},
+          "target_scope": {"enum": ["individual_cluster", "organization"]},
+          "applicability": {
+            "type": "object",
+            "required": ["Starter", "Essential", "Premium", "Dedicated", "BYOC"],
+            "additionalProperties": false,
+            "properties": {
+              "Starter": {"enum": ["R", "C", "D", "X", "—"]},
+              "Essential": {"enum": ["R", "C", "D", "X", "—"]},
+              "Premium": {"enum": ["R", "C", "D", "X", "—"]},
+              "Dedicated": {"enum": ["R", "C", "D", "X", "—"]},
+              "BYOC": {"enum": ["R", "C", "D", "X", "—"]}
+            }
+          },
+          "capabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "implementation": {
+            "type": "object",
+            "required": ["status"],
+            "properties": {
+              "status": {"enum": ["implemented", "partial", "planned"]},
+              "adapters": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+            }
+          }
+        }
+      }
+    }
+  }
+}

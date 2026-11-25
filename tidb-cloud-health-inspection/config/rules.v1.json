@@ -1,0 +1,204 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Centralized thresholds for the inspection. 'high'/'low' rules are applied directly by the collection layer; 'params' rules hold the knobs for named adapters that keep sustained-window or correlation logic.",
+  "rules": {
+    "sql_duration_p99_ms": {
+      "kind": "high",
+      "unit": "ms",
+      "notice": 50,
+      "warning": 200,
+      "critical": 1000,
+      "description": "Query latency P99 series, peak (max) guardrail in ms.",
+      "serves": [
+        "SQL-02"
+      ]
+    },
+    "sql_duration_p999_ms": {
+      "kind": "high",
+      "unit": "ms",
+      "notice": 200,
+      "warning": 1000,
+      "critical": 5000,
+      "description": "Extreme-tail P999 series, peak (max) guardrail in ms.",
+      "serves": [
+        "SQL-03"
+      ]
+    },
+    "sql_error_ratio_pct": {
+      "kind": "high",
+      "unit": "%",
+      "notice": 0.1,
+      "warning": 1.0,
+      "critical": 2.0,
+      "description": "Window-average failed-SQL ratio.",
+      "serves": [
+        "SQL-05"
+      ]
+    },
+    "rc_request_wait_s": {
+      "kind": "high",
+      "unit": "s",
+      "warning": 0.01,
+      "critical": 0.05,
+      "description": "Resource-control request wait peak. No NOTICE band (notice defaults to warning), matching the original two-band logic: <0.01 HEALTHY, 0.01-0.05 WARNING, >=0.05 CRITICAL.",
+      "serves": [
+        "RCU-05"
+      ]
+    },
+    "tidb_cpu_pct": {
+      "kind": "high",
+      "unit": "%",
+      "warning": 85,
+      "description": "TiDB CPU against core quota; warn-only (no CRITICAL band).",
+      "serves": [
+        "TIDB-01"
+      ]
+    },
+    "tikv_cpu_sustained": {
+      "kind": "params",
+      "sustain_warn_pct": 85.0,
+      "rolling_points": 3,
+      "step_seconds": 300,
+      "description": "TiKV CPU sustained-pressure rule (CPU_SUSTAIN_WARN_PCT over ROLLING_15M_POINTS). Logic lives in the tikv_thread_pool_pressure adapter.",
+      "serves": [
+        "TIKV-01"
+      ]
+    },
+    "tikv_memory_pct": {
+      "kind": "high",
+      "unit": "%",
+      "warning": 85,
+      "critical": 90,
+      "description": "TiKV RSS against memory limit (MEMORY_WARN_PCT / MEMORY_ERROR_PCT).",
+      "serves": [
+        "TIKV-02"
+      ]
+    },
+    "tikv_memory_leak": {
+      "kind": "params",
+      "baseline_window": "7d",
+      "observe_delta_pct": 3.0,
+      "warn_delta_pct": 5.0,
+      "explain_region_delta_abs": 100.0,
+      "explain_region_delta_ratio_pct": 10.0,
+      "explain_qps_delta_abs": 100.0,
+      "explain_qps_delta_ratio_pct": 20.0,
+      "explain_cpu_delta_pct": 5.0,
+      "description": "TiKV memory-growth-vs-7d-baseline correlation knobs (MEMORY_LEAK_* constants).",
+      "serves": [
+        "TIKV-02"
+      ]
+    },
+    "tikv_grpc": {
+      "kind": "params",
+      "fail_30m_warn": 100.0,
+      "p99_warn_s": 1.0,
+      "description": "TiKV gRPC failure-count-over-30m and P99 warn thresholds (GRPC_FAIL_30M_WARN_THRESHOLD / GRPC_P99_WARN_SECONDS).",
+      "serves": [
+        "TIKV-03"
+      ]
+    },
+    "tikv_compaction_pending": {
+      "kind": "params",
+      "sustain_warn_bytes": 214748364800,
+      "reference_bytes": 274877906944,
+      "peak_warn_bytes": 549755813888,
+      "description": "Pending-compaction-bytes sustained/peak thresholds (200/256/512 GiB).",
+      "serves": [
+        "TIKV-06"
+      ]
+    },
+    "tikv_unified_read_pool": {
+      "kind": "params",
+      "hot_pct": 80.0,
+      "peer_low_pct": 50.0,
+      "rolling_points": 3,
+      "description": "Unified Read Pool hotspot detection (UNIFIED_READ_HOT_PCT / UNIFIED_READ_PEER_LOW_PCT).",
+      "serves": [
+        "TIKV-07"
+      ]
+    },
+    "tikv_slow_score": {
+      "kind": "high",
+      "warning": 100,
+      "description": "TiKV slow score alert value (SLOW_SCORE_ALERT_VALUE); warn-only.",
+      "serves": [
+        "TIKV-09"
+      ]
+    },
+    "tikv_raft_log_lag_p99": {
+      "kind": "high",
+      "warning": 5000,
+      "description": "Raft log lag P99 alert (RAFT_LOG_LAG_P99_ALERT); warn-only.",
+      "serves": [
+        "TIKV-09"
+      ]
+    },
+    "store_capacity_usage_pct": {
+      "kind": "high",
+      "unit": "%",
+      "warning": 80,
+      "description": "Physical store capacity usage and rise (STORE_USAGE_WARN_PCT); rise_warn_pct in knobs.",
+      "rise_warn_pct": 10.0,
+      "serves": [
+        "PD-07",
+        "INF-03"
+      ]
+    },
+    "inf_iops_exceeded": {
+      "kind": "high",
+      "warning": 1.0,
+      "description": "Cloud-volume exceeded-IOPS rate warn threshold (IOPS_EXCEED_WARN_THRESHOLD); warn-only.",
+      "serves": [
+        "INF-07"
+      ]
+    },
+    "cdc_checkpoint_lag_s": {
+      "kind": "high",
+      "unit": "s",
+      "warning": 300,
+      "critical": 3600,
+      "description": "TiCDC changefeed checkpoint/resolved-ts lag (seconds): healthy < 300s, warning 300-3600s, critical >= 3600s.",
+      "serves": [
+        "CDC-02"
+      ]
+    },
+    "tikv_cpu_pct": {
+      "kind": "high",
+      "unit": "%",
+      "warning": 85,
+      "description": "TiKV storage-node CPU against core quota; warn-only coarse customer signal (deep sustained-high analysis delegated to o11y).",
+      "serves": [
+        "TIKV-01"
+      ]
+    },
+    "tikv_compaction_pending_peak": {
+      "kind": "high",
+      "unit": "bytes",
+      "warning": 549755813888,
+      "description": "Pending-compaction-bytes peak (512 GiB), coarse customer signal; deep sustained analysis delegated to o11y.",
+      "serves": [
+        "TIKV-06"
+      ]
+    },
+    "restart_count": {
+      "kind": "high",
+      "warning": 1,
+      "description": "Component restart count over the window; warn-only coarse signal (any restart >=1 → WARNING).",
+      "serves": [
+        "TIKV-10",
+        "AVL-02"
+      ]
+    },
+    "cdc_checkpoint_lag_s": {
+      "kind": "high",
+      "unit": "seconds",
+      "warning": 300,
+      "critical": 3600,
+      "description": "TiCDC changefeed checkpoint/resolved-ts lag (worse of the two); coarse customer signal (WARNING >=5m, CRITICAL >=1h). Deep lag-trend/root-cause delegated to o11y.",
+      "serves": [
+        "CDC-02"
+      ]
+    }
+  }
+}

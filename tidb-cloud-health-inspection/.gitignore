@@ -1,0 +1,22 @@
+# Secrets — never commit (CLINIC_API_KEY, any Feishu creds). Use config/env.example.
+.env
+.env.*
+!config/env.example
+
+# Run artifacts (regenerable)
+output/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local scratch / downloaded samples
+Samples/_extracted/
+
+# macOS / editor / stray junk
+.DS_Store
+**/.DS_Store
+$SP/
+.claude/
