@@ -482,8 +482,13 @@ def inspect_one(api: ClinicAPI, cluster_id: str, args: argparse.Namespace, outpu
     normalized_path = output_dir / "normalized.json"
     report_path = output_dir / "health-report.md"
     # Deep-analysis handoff: this skill collects + reports; per-component deep dives
-    # are delegated to the external o11y skill via this routable contract.
-    normalized["handoff"] = build_handoff(normalized)
+    # are delegated to the external o11y skill via this routable contract. It is a
+    # best-effort artifact — a handoff build failure must never fail the inspection
+    # (the customer report + evidence stand on their own), so fail closed to empty.
+    try:
+        normalized["handoff"] = build_handoff(normalized)
+    except Exception:
+        normalized["handoff"] = {"items": []}
     # Keep the bulky internal report out of collector.json; write it separately.
     internal_markdown = raw.pop("internal_report_markdown", None)
     write_json(raw_path, raw)

@@ -3,6 +3,7 @@ import os
 import unittest
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -69,6 +70,53 @@ class PublishReportTests(unittest.TestCase):
         out = pr._rewrite_chart_paths(md, Path.cwd() / "output" / "run")
         self.assertIn("](@./output/run/charts/qps.png)", out)
         self.assertIn("](@./output/run/charts/rcu.png)", out)
+
+
+class WritePathOverrideTests(unittest.TestCase):
+    """Declaring the Feishu write path at invocation (CLI overrides over the config)."""
+
+    def _args(self, **kw):
+        base = dict(parent_token=None, parent_type=None, token_env=None,
+                    doc_title_template=None, group_by_org=None, identity=None)
+        base.update(kw)
+        return SimpleNamespace(**base)
+
+    def test_parent_token_override_wins_over_env_and_config(self):
+        os.environ["FEISHU_PARENT_TOKEN"] = "env_tok"
+        try:
+            cfg = pr._apply_overrides(CFG, self._args(parent_token="cli_tok", parent_type="folder"))
+            self.assertEqual(cfg["parent"]["token"], "cli_tok")
+            self.assertEqual(cfg["parent"]["type"], "folder")
+            # _resolve_parent_token prefers the (now CLI-set) token over the env var.
+            self.assertEqual(pr._resolve_parent_token(cfg["parent"]), "cli_tok")
+        finally:
+            os.environ.pop("FEISHU_PARENT_TOKEN", None)
+
+    def test_overrides_do_not_mutate_input_config(self):
+        before = json.dumps(CFG, sort_keys=True)
+        pr._apply_overrides(CFG, self._args(parent_token="x", group_by_org=False,
+                                            doc_title_template="{cluster_name}", identity="bot"))
+        self.assertEqual(json.dumps(CFG, sort_keys=True), before)  # original untouched
+
+    def test_no_overrides_is_identity(self):
+        cfg = pr._apply_overrides(CFG, self._args())
+        self.assertEqual(cfg["parent"]["token_env"], "FEISHU_PARENT_TOKEN")
+        self.assertTrue(cfg["structure"]["group_by_org"])
+
+    def test_pure_cli_without_config_file(self):
+        # Missing config file → {}; the write path comes entirely from the CLI.
+        cfg = pr._apply_overrides(pr._load_config("/nonexistent/delivery.json"),
+                                  self._args(parent_token="only_cli", parent_type="wiki"))
+        self.assertEqual(cfg["parent"]["token"], "only_cli")
+        self.assertEqual(pr._resolve_parent_token(cfg["parent"]), "only_cli")
+
+    def test_group_by_org_can_be_disabled_at_invocation(self):
+        with tempfile.TemporaryDirectory() as d:
+            rd = Path(d) / "rep"
+            _make_report(rd)
+            cfg = pr._apply_overrides(CFG, self._args(parent_token="t", group_by_org=False))
+            plan = pr.publish(rd, cfg, org="bitunix", title_override=None, dry_run=True)
+            self.assertIsNone(plan["org_container"])  # grouping off despite an org
 
 
 if __name__ == "__main__":

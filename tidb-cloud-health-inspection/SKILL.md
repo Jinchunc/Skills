@@ -149,7 +149,20 @@ configured**, not hard-coded, so the skill is portable across environments:
 # template); the environment-specific root token comes from $FEISHU_PARENT_TOKEN.
 python3 scripts/publish_report.py --report-dir ./output/<run_dir> --org <org> --dry-run
 python3 scripts/publish_report.py --report-dir ./output/<run_dir> --org <org>   # publish
+
+# …or declare the write path AT INVOCATION (overrides the config; no file edit):
+python3 scripts/publish_report.py --report-dir ./output/<run_dir> \
+  --parent-token <WIKI_NODE_OR_FOLDER_TOKEN> --parent-type wiki \
+  --doc-title-template "{cluster_name} 巡检 {date}" --no-group-by-org --dry-run
 ```
+
+Invocation-time write-path flags (each overrides `config/delivery.v1.json`, so the
+destination can be declared per call without editing the committed config):
+`--parent-token` (destination Wiki node / Drive folder token — wins over the config
+token and `$FEISHU_PARENT_TOKEN`), `--parent-type wiki|folder`, `--token-env <NAME>`
+(name a different env var for the token), `--doc-title-template`,
+`--group-by-org`/`--no-group-by-org`, `--identity user|bot`. With a missing
+`--config`, the write path comes entirely from these flags.
 
 - `publish_report.py` reads the delivery config, rewrites chart refs to `@./…`,
   re-runs the privacy validator, then creates the doc under the configured parent

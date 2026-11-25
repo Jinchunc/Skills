@@ -48,8 +48,37 @@ def _run(cmd: list[str], stdin: str | None = None) -> dict:
 
 
 def _load_config(path: str) -> dict:
-    cfg = json.loads(Path(path).read_text(encoding="utf-8"))
+    """Load the feishu delivery block from the config file. A missing file yields {}
+    so the write path can be declared purely at invocation (CLI overrides below)."""
+    p = Path(path)
+    if not p.exists():
+        return {}
+    cfg = json.loads(p.read_text(encoding="utf-8"))
     return cfg.get("feishu") or {}
+
+
+def _apply_overrides(cfg: dict, args: argparse.Namespace) -> dict:
+    """Overlay invocation-time CLI flags onto the delivery config so the Feishu write
+    path (destination token/type, grouping, title) can be declared at call time
+    without editing the config file. Only flags that were given take effect; the rest
+    fall back to the config. ``--parent-token`` wins over both the config token and the
+    env var. Returns a copy — the loaded config is never mutated."""
+    cfg = json.loads(json.dumps(cfg))  # deep copy
+    parent = cfg.setdefault("parent", {})
+    structure = cfg.setdefault("structure", {})
+    if args.parent_token is not None:
+        parent["token"] = args.parent_token
+    if args.parent_type is not None:
+        parent["type"] = args.parent_type
+    if args.token_env is not None:
+        parent["token_env"] = args.token_env
+    if args.doc_title_template is not None:
+        structure["doc_title_template"] = args.doc_title_template
+    if args.group_by_org is not None:
+        structure["group_by_org"] = args.group_by_org
+    if args.identity is not None:
+        cfg["identity"] = args.identity
+    return cfg
 
 
 def _resolve_parent_token(parent: dict) -> str:
@@ -171,8 +200,23 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--config", default=DEFAULT_CONFIG)
     ap.add_argument("--title")
     ap.add_argument("--dry-run", action="store_true")
+    # Invocation-time Feishu write-path overrides (take precedence over --config).
+    ap.add_argument("--parent-token",
+                    help="Feishu destination token (Wiki node or Drive folder). Declares the "
+                         "write path at call time; wins over the config token and the env var.")
+    ap.add_argument("--parent-type", choices=["wiki", "folder"],
+                    help="Destination type (wiki node or drive folder); overrides config.")
+    ap.add_argument("--token-env",
+                    help="Name of the env var holding the parent token; overrides config.")
+    ap.add_argument("--doc-title-template",
+                    help="Document title template (fields: {cluster_name} {date} {plan} "
+                         "{cluster_id} {org}); overrides config.")
+    ap.add_argument("--group-by-org", action=argparse.BooleanOptionalAction, default=None,
+                    help="Create a per-org container under the parent (or --no-group-by-org); overrides config.")
+    ap.add_argument("--identity", choices=["user", "bot"],
+                    help="lark-cli identity; overrides config (default: user).")
     args = ap.parse_args(argv)
-    cfg = _load_config(args.config)
+    cfg = _apply_overrides(_load_config(args.config), args)
     try:
         result = publish(Path(args.report_dir), cfg, args.org, args.title, args.dry_run)
     except (RuntimeError, FileNotFoundError) as exc:
