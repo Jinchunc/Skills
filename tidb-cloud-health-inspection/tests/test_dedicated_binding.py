@@ -1,14 +1,15 @@
-"""Tests for the Dedicated/BYOC report -> canonical check_results binding and wiring."""
+"""Tests for the Dedicated/BYOC report -> canonical check_results binding.
+
+The monolith (dedicated_health_inspection.py) was retired 2026-11-25; collect_full_stack
+is now native. dedicated_binding is kept as a reference oracle for the CDC parity +
+golden shape guardrails, so these tests still pin its behavior."""
 import unittest
-from types import SimpleNamespace
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import dedicated_binding as db
-import dedicated_health_inspection as dedicated
-import health_inspection as hi
 
 STATUS_RANK = {"HEALTHY": 0, "NOTICE": 1, "WARNING": 2, "CRITICAL": 3}
 
@@ -172,91 +173,6 @@ class BindingTests(unittest.TestCase):
         # When the collector flags warnings, the bound subset reaches at least WARNING.
         report = healthy_report(verdict="Warning", analysis={"cpu_sustained_high": [1]})
         self.assertEqual(worst(db.bind_dedicated_results(report)), db.verdict_to_status(report["verdict"]))
-
-
-class WiringTests(unittest.TestCase):
-    def setUp(self):
-        self._client = dedicated.InspectionClient
-        self._inspect = dedicated.inspect_cluster
-        dedicated.InspectionClient = lambda env_file=None: object()
-
-        def fake_inspect(client, cluster_id, window):
-            report = healthy_report(
-                verdict="Warning",
-                analysis={"cpu_sustained_high": [{"instance": "tikv-0"}]},
-                unknown_checks=["gRPC P99: timeout"],
-            )
-            report["window"] = {
-                "timezone": "UTC",
-                "start_utc": "2026-11-20T00:00:00Z",
-                "end_utc": "2026-11-21T00:00:00Z",
-                "seconds": 86400,
-            }
-            report["markdown"] = "# TiKV Health\n\nThe cluster has warning-level findings.\n"
-            return report
-
-        dedicated.inspect_cluster = fake_inspect
-
-    def tearDown(self):
-        dedicated.InspectionClient = self._client
-        dedicated.inspect_cluster = self._inspect
-
-    def test_collect_full_stack_binds_and_keeps_verdict(self):
-        args = SimpleNamespace(start=None, end=None, relative_window="2h", profile="health", registry=None, env_file=".env")
-        raw, normalized, markdown = hi.collect_full_stack("C1", "Dedicated", args)
-        # Canonical binding present and routed through the engine.
-        self.assertTrue(raw["check_results"])
-        self.assertEqual(normalized["plan"], "Dedicated")
-        self.assertIn("check_results", normalized)
-        # Overall status stays the proven collector verdict (Warning -> WARNING).
-        self.assertEqual(normalized["status"], "WARNING")
-        self.assertEqual(normalized["overall_status_source"], "max(collector_verdict, engine)")
-        self.assertEqual(normalized["confidence"], "MEDIUM")  # unknown_checks present
-        self.assertTrue(markdown)
-        # Fix 4: every bound result is within the registry selection.
-        selected = set(normalized["selected_check_ids"])
-        self.assertTrue(all(r["check_id"] in selected for r in raw["check_results"]))
-
-    def test_collect_full_stack_passes_artifact_validation(self):
-        args = SimpleNamespace(start=None, end=None, relative_window="2h", profile="health", registry=None, env_file=".env")
-        raw, normalized, markdown = hi.collect_full_stack("C1", "Dedicated", args)
-        gate = {"status": normalized["status"]}
-        validation = hi.validate_artifacts(raw, normalized, markdown, gate, "Dedicated")
-        self.assertTrue(validation["passed"], validation["checks"])
-
-    def _report(self, verdict, analysis):
-        report = healthy_report(verdict=verdict, analysis=analysis)
-        report["window"] = {"timezone": "UTC", "start_utc": "2026-11-20T00:00:00Z", "end_utc": "2026-11-21T00:00:00Z", "seconds": 86400}
-        report["markdown"] = "# TiKV Health\n\nInternal report.\n"
-        return report
-
-    def _run(self, verdict, analysis):
-        dedicated.inspect_cluster = lambda client, cluster_id, window: self._report(verdict, analysis)
-        args = SimpleNamespace(start=None, end=None, relative_window="2h", profile="health", registry=None, env_file=".env")
-        return hi.collect_full_stack("C1", "Dedicated", args)[1]
-
-    def test_binding_warning_not_masked_by_healthy_verdict(self):
-        # memory_trend_risers -> binding WARNING, but it raises no collector finding
-        # (verdict Healthy). Overall must not be masked back to HEALTHY.
-        normalized = self._run("Healthy", {"memory_trend_risers": ["tikv-0"]})
-        self.assertEqual(normalized["status"], "WARNING")
-
-    def test_binding_critical_not_masked_by_needs_review(self):
-        normalized = self._run("Needs Review", {"memory_error_windows": [{"instance": "tikv-0"}]})
-        self.assertEqual(normalized["status"], "CRITICAL")
-
-    def test_collector_crash_degrades_to_na(self):
-        # Top-level degradation: a full-stack collector exception must NOT crash the
-        # run — it yields an all-N/A report with the error recorded.
-        def boom(client, cluster_id, window):
-            raise RuntimeError("collector exploded")
-
-        dedicated.inspect_cluster = boom
-        args = SimpleNamespace(start=None, end=None, relative_window="2h", profile="health", registry=None, env_file=".env")
-        raw, normalized, markdown = hi.collect_full_stack("C1", "Dedicated", args)
-        self.assertEqual(normalized["status"], "N/A")
-        self.assertIn("collector_error", str(raw.get("unknown_checks")))
-        self.assertTrue(markdown)
 
 
 if __name__ == "__main__":

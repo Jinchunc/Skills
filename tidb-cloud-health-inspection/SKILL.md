@@ -77,9 +77,6 @@ Each run writes, under `--output-dir`:
   slots (执行摘要 / 关键风险 / 优先建议) via `payload["interpretations"]` — see
   "Choosing what to deep-analyze". Deliver with the global `lark-cli` (see below).
 - `charts/*.png` — the trend-comparison images the report references.
-- `internal-report.md` — Dedicated/BYOC only: **additional** internal detail
-  (instance-level signals, links). Supplementary, not the customer report and not a
-  replacement for it.
 - `handoff.json` — the deep-analysis handoff (routed flagged checks); see
   "Division of labor" below.
 - `normalized.json`, `gate.json`, `artifacts/`, `state/` — internal evidence,

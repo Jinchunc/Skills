@@ -144,15 +144,23 @@ TIDB-01/02    TIKV-01/02/03/04/05/06/07/08/09/10
      （**排除 N/A，与 `checklist_engine.evaluate` 一致**）的 worst-of；`derive_status` 对每个 report 用它再跨 report 取 max。
      无 `check_results` 的 payload 行为不变（多集群 reports/results 路径不受影响）。与 `collect_full_stack` 的
      `worse_status(verdict, engine)` 口径对齐。新增 2 条 gate 单测（check 超 verdict → 抬状态；N/A 不虚抬）。
-4. **退役巨石**：确认无引用（含 `[INTERNAL]` CLI、`internal-report.md` 的生成，Loki 日志扫描现已在 `ClinicAPI.loki_query_range`）后删除或归档；
-   `tikv_thread_pool_pressure` 等 stub 在此过程中落实（`collection_adapters.py` 已有 TODO）。
+4. ✅ **退役巨石（已完成,2026-11-25）**：删除 `scripts/dedicated_health_inspection.py`（~2800 行）。
+   - `collect_full_stack` 重写为纯 native（签名加 `metadata`,inspect_one 传入 `get_cluster_by_id` 结果）:
+     23 项走 `_collect_native_dedicated`、SCOPE-01/04/08 内联（physical_infrastructure_queried=true）、
+     SQL 工作负载走 `_collect_workload`;overview metadata 直取 ClinicAPI、plan-cache 走新 `_fetch_plan_cache_hit_pct`;
+     磁盘设备正则（原 `extract_tikv_storage_type` 等）就地移植进 `_resolve_disk_device_regex`;删 `_collect_reliability`（CDC 已 native）。
+   - **verdict 语义变更（用户确认）**:`worse_status(巨石 verdict, engine)` → 纯 engine worst-of,`overall_status_source="engine_worst_of_checks"`;深度/持续窗口判定交 o11y。
+   - **internal-report.md 取消**（巨石内部 markdown,非客户报告;客户报告 health-report.md + gate 证据包不受影响）。
+   - **保留** `dedicated_binding.py` / `dedicated_golden.py` 为**测试 oracle**:CDC 活跃路径护栏(`test_dedicated_cdc_parity`)与 golden 形状回归仍跑;删 `WiringTests`(巨石桩)、`test_dedicated_thresholds.py`、`test_time_window.py`(均测巨石内部)。`NATIVE_DEDICATED_ADAPTER_CHECKS` env 开关随巨石退役移除。
+   - **实测**:整条 `inspect` 退 0、golden 23 项零硬差异、metadata(aws/us-east-1/v8.5.4/active)齐全、collector=native_full_stack、187 测试绿。
+   - 残留 stub `tikv_thread_pool_pressure` 等仍为 TODO（`collection_adapters.py`）。
 
 ## 不变量（每阶段必须守住）
 
 - **诚实 N/A**：搬迁不得把原本 N/A 的 check 变成假 Healthy / 0。
 - **按 plan 容错**：沿用 shared 已验证的回退（le→vmrange、cluster_id 标签缺失、NGM、resource_manager）。
 - **护栏绿**：golden fixture 对齐 + `python3 -m unittest discover -s tests` 全绿 + 真实 Dedicated 联调抽验。
-- **可回滚**：每组一个变更；binding 里保留"回退到巨石"的开关直到该组护栏稳定。
+- **可回滚**：迁移期每组一个变更、保留回退开关直到护栏稳定。**巨石已于 2026-11-25 退役**,native 为唯一实现;回退需 `git revert`。
 
 ## 验证
 ```bash

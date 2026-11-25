@@ -79,8 +79,8 @@ Module responsibilities:
 | `scripts/inspection_core.py` | Shared primitives: time-window parsing, percentiles (linear R-7), distributions, status thresholds, plan normalization. |
 | `scripts/checklist_registry.py` | Loads/validates the registry; selects checks by plan/profile/scope/capability; generates the Markdown matrix. |
 | `scripts/collection_adapters.py` | Selection-driven collection layer: recipes + adapters + per-run query cache; `apply_rule`; offline recipe/rule validation. |
-| `scripts/dedicated_health_inspection.py` | [internal] Full-stack Dedicated/BYOC collector (~60 signals), called as a library (`inspect_cluster()`) by `health_inspection.py`. Its own CLI is dev/debug only, not the user entry point. See `references/dedicated-migration-plan.md`. |
-| `scripts/dedicated_binding.py` | Maps the full-stack collector's structured report to canonical `check_results`. |
+| `scripts/dedicated_binding.py` | [test oracle] Maps a dedicated collector report to canonical `check_results`. The monolith (`dedicated_health_inspection.py`) was retired 2026-11-25; Dedicated/BYOC now collects natively via `collection_adapters`. This module is kept only as the reference oracle for the CDC parity + golden shape guardrails. See `references/dedicated-migration-plan.md`. |
+| `scripts/dedicated_golden.py` | [test oracle] Golden shape capture/compare for the 23 Dedicated checks (regression anchor against `tests/fixtures/dedicated_golden.json`). |
 | `scripts/checklist_engine.py` | Binds collector results to the selection, rejects prohibited/out-of-scope, synthesizes N/A, computes status + confidence. |
 | `scripts/inspection_gate.py` | Persists state, coverage, finding/checklist signatures; decides the single notification owner; never calls an LLM or sends a notification. |
 | `scripts/customer_report.py` | Single customer-report renderer for every plan + the privacy validator. |
@@ -331,8 +331,7 @@ instance names, pods, Grafana links, and PromQL cannot reach the customer report
 construction. `validate_customer_report` is a structural safety net on top: it
 rejects a report containing internal check IDs, URLs, PromQL/infrastructure tokens,
 or forbidden terminology **in English or Chinese**. Missing or prohibited evidence
-is `N/A`, never Healthy. The Dedicated/BYOC collector's detailed internal report is
-written separately as `internal-report.md` (not customer-facing).
+is `N/A`, never Healthy.
 
 **Source bindings still pending (render N/A until bound).** Slow-log total count
 (SQL-06), active sessions (SQL-08), logical storage start/end/growth (LST-01/02/03),
@@ -350,8 +349,6 @@ parity are not yet implemented; see §14.)
 Every successful run writes, under `--output-dir`:
 
 - `health-report.md` — customer-safe report (every plan).
-- `internal-report.md` — Dedicated/BYOC only: the full-stack collector's detailed
-  internal report.
 - `collector.json` — raw collector output.
 - `normalized.json` — the canonical internal model (`cluster_id`, `plan`, `window`,
   `status`, `confidence`, `check_results[]`, selection, coverage).

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -175,53 +176,21 @@ def worse_status(a: str, b: str) -> str:
     return a if _SEVERITY_RANK.get(a, -1) >= _SEVERITY_RANK.get(b, -1) else b
 
 
-def _collect_reliability(client: Any, cluster_id: str, window: Any) -> dict[str, Any]:
-    """TiCDC changefeed health (state counts + checkpoint/resolved-ts lag) via the
-    dedicated metrics client, for §6. Fail-closed: {} on error; a missing metric
-    simply stays absent → N/A at binding time."""
-    out: dict[str, Any] = {}
-    end_iso = window.end.isoformat()
-
-    def _scalar(query: str) -> float | None:
-        try:
-            resp = client.metrics.query_instant(cluster_id, query, end_iso)
-            res = (resp or {}).get("data", {}).get("result", [])
-            return float(res[0]["value"][1]) if res else None
-        except Exception:
-            return None
-
+def _fetch_plan_cache_hit_pct(api: ClinicAPI, cluster_id: str, window: TimeWindow) -> float | None:
+    """§5.4 execution-plan health: TiDB plan-cache hit rate (%) at the window end, via
+    the Clinic metrics API. Fail-closed → None (metadata row renders N/A). TiCDC
+    changefeed health (CDC-01/02) is now collected natively by the recipe layer."""
     try:
-        resp = client.metrics.query_instant(cluster_id, "ticdc_coordinator_changefeed_state", end_iso)
-        states: dict[str, float] = {}
-        for series in (resp or {}).get("data", {}).get("result", []):
-            state = (series.get("metric") or {}).get("state")
-            if state is None:
-                continue
-            try:
-                value = float(series["value"][1])
-            except (TypeError, ValueError, IndexError, KeyError):
-                continue
-            states[state] = max(states.get(state, 0.0), value)
-        if states:
-            out["changefeed_states"] = states
+        resp = api.query_instant(
+            str(cluster_id),
+            "100 * sum(rate(tidb_server_plan_cache_total[5m])) / "
+            "(sum(rate(tidb_server_plan_cache_total[5m])) + sum(rate(tidb_server_plan_cache_miss_total[5m])))",
+            window.end_iso,
+        )
+        res = (resp or {}).get("data", {}).get("result", []) if isinstance(resp, dict) else []
+        return float(res[0]["value"][1]) if res else None
     except Exception:
-        pass
-
-    lag = _scalar("max(ticdc_dispatchermanager_checkpoint_ts_lag)")
-    if lag is not None:
-        out["cdc_checkpoint_lag_max"] = lag
-    resolved = _scalar("max(ticdc_dispatchermanager_resolved_ts_lag)")
-    if resolved is not None:
-        out["cdc_resolved_lag_max"] = resolved
-
-    # §5.4 execution-plan health: plan-cache hit rate (%).
-    hit = _scalar(
-        "100 * sum(rate(tidb_server_plan_cache_total[5m])) / "
-        "(sum(rate(tidb_server_plan_cache_total[5m])) + sum(rate(tidb_server_plan_cache_miss_total[5m])))"
-    )
-    if hit is not None:
-        out["plan_cache_hit_pct"] = hit
-    return out
+        return None
 
 
 def _collect_workload(api: ClinicAPI, cluster_id: str, args: argparse.Namespace,
@@ -265,18 +234,30 @@ def native_dedicated_checks() -> tuple[str, ...]:
     return tuple(cid for cid, recipe in load_recipes().items() if recipe.get("dedicated_native"))
 
 
+_DISK_DEVICE_RE_DEFAULT = r"nvme.*|xvd.*|sd.*|vd.*|dm-.*"
+
+
 def _resolve_disk_device_regex(api: ClinicAPI, cluster_id: str) -> str:
     """TiKV data-disk device regex for node-disk→pod join queries. Resolves the
     storage-type-specific device when the cluster detail exposes it; otherwise the
-    catch-all default (which matches the collector's own fallback)."""
+    catch-all default. Ported from the retired dedicated monolith's device logic."""
     try:
-        from dedicated_health_inspection import (
-            DISK_DEVICE_RE, build_device_regex, extract_tikv_storage_type, resolve_tikv_disk_devices)
         detail = api.get_cluster_by_id(cluster_id)
-        storage_type = extract_tikv_storage_type(detail) if isinstance(detail, dict) else ""
-        return build_device_regex(resolve_tikv_disk_devices(storage_type))
+        storage_type = ""
+        if isinstance(detail, dict):
+            tikv = (detail.get("components") or {}).get("COMPONENT_TYPE_TIKV") or {}
+            storage_type = str(tikv.get("storageType") or "").strip().lower()
+        if storage_type == "plus":
+            devices = ["nvme2n1"]
+        elif storage_type in {"standard", "performance"}:
+            devices = ["nvme2n1", "nvme3n1"]
+        else:
+            devices = []
+        if not devices:
+            return _DISK_DEVICE_RE_DEFAULT
+        return "|".join(re.escape(device) for device in devices)
     except Exception:
-        return r"nvme.*|xvd.*|sd.*|vd.*|dm-.*"
+        return _DISK_DEVICE_RE_DEFAULT
 
 
 def _collect_native_dedicated(api: ClinicAPI, cluster_id: str, args: argparse.Namespace,
@@ -298,42 +279,21 @@ def _collect_native_dedicated(api: ClinicAPI, cluster_id: str, args: argparse.Na
 
 
 def collect_full_stack(
+    metadata: dict[str, Any],
     cluster_id: str,
     plan: str,
     args: argparse.Namespace,
 ) -> tuple[dict[str, Any], dict[str, Any], str]:
-    from dedicated_health_inspection import InspectionClient, inspect_cluster, resolve_window as resolve_dedicated_window
-    from dedicated_binding import bind_dedicated_results, verdict_to_status
-
-    window = resolve_dedicated_window(args.start, args.end, args.relative_window, "UTC")
-    client = InspectionClient(args.env_file)
-    try:
-        report = inspect_cluster(client, cluster_id, window)
-        # §6 reliability signals (TiCDC changefeed health) via the same metrics
-        # client; merged into report.metrics for dedicated_binding. Fail-closed.
-        report.setdefault("metrics", {}).update(_collect_reliability(client, cluster_id, window))
-    except Exception as exc:
-        # Top-level degradation: a full-stack collector failure must NOT crash the
-        # whole run. Produce an all-N/A report (fail-closed) with the error recorded,
-        # so the cluster is reported as N/A/LOW rather than aborting the inspection.
-        report = {
-            "cluster_id": str(cluster_id),
-            "cluster_name": str(cluster_id),
-            "provider": "", "region": "", "version": "", "status": "",
-            "verdict": "unknown",
-            "analysis": {}, "metrics": {},
-            "findings": [],
-            "unknown_checks": [f"collector_error: {exc}"],
-            "window": {
-                "timezone": getattr(window, "timezone_name", "UTC"),
-                "start_utc": window.start.isoformat(),
-                "end_utc": window.end.isoformat(),
-                "seconds": getattr(window, "seconds", 0),
-            },
-            "markdown": f"# Full-stack collection failed\n\n{exc}\n",
-            "collector_error": str(exc),
-        }
-
+    """Native full-stack collection for Dedicated/BYOC — no monolith (retired
+    2026-11-25). Every check comes from the recipe/adapter layer: the 23 dedicated
+    signals (data-driven native set; OVR/AVL read overview metadata) + SCOPE
+    (full-stack authorized) + tenant SQL workload (shared layer, matches the logical
+    report). Overview metadata comes from the Clinic cluster API. Overall status is the
+    engine worst-of the checks; deep sustained-window / root-cause judgment is
+    delegated to o11y via the handoff. Fail-closed: a collection failure leaves checks
+    N/A (engine-synthesized), never a fabricated HEALTHY."""
+    api = ClinicAPI(args.env_file)
+    window = resolve_window(args.start, args.end, args.relative_window, args.step_seconds)
     registry = load_registry(args.registry) if args.registry else load_registry()
     selection = select_checks(
         registry,
@@ -345,101 +305,66 @@ def collect_full_stack(
             capabilities=plan_capabilities(registry, plan),
         ),
     )
-    # Bind only within the registry selection so a registry/capability change can
-    # never make evaluate() reject a hard-coded id and crash the dedicated run.
-    # On a collector failure, bind nothing: the engine then synthesizes N/A for every
-    # selected check (fail-closed) instead of the binding's default-HEALTHY (scope,
-    # compaction/read-pool) masking a total outage as HEALTHY.
     selected_ids = set(selection["selected_check_ids"])
+
+    # Overview from the Clinic cluster API (native; replaces the monolith report).
+    overview = {k: (metadata.get(k) or "") for k in ("provider", "region", "version", "status")}
+    cluster_name = metadata.get("name") or str(cluster_id)
+
     workload_prev: dict[str, Any] = {}
     workload_prev_window: dict[str, Any] | None = None
-    if report.get("collector_error"):
-        bound = []
-    else:
-        bound = [item for item in bind_dedicated_results(report) if item["check_id"] in selected_ids]
-        # §3 workload (tenant SQL RED) + §5 owner SQL Top-N — also in the dedicated
-        # selection; collect via the shared layer so dedicated §3/§5 match logical.
+    by_id: dict[str, dict[str, Any]] = {}
+    try:
+        # The 23 dedicated signals via the native recipe/adapter layer (data-driven
+        # native set). collect() is per-check resilient → a bad metric yields N/A.
+        native_ids = [c for c in native_dedicated_checks() if c in selected_ids]
+        if native_ids:
+            by_id.update(_collect_native_dedicated(api, cluster_id, args, native_ids, metadata=overview))
+        # SCOPE: full-stack is authorized for Dedicated/BYOC (physical infra probed).
+        for sid in ("SCOPE-01", "SCOPE-04", "SCOPE-08"):
+            if sid in selected_ids:
+                by_id.setdefault(sid, {
+                    "check_id": sid, "status": "HEALTHY", "reason": "scope_resolved",
+                    "evidence": {"full_stack_authorized": True, "physical_infrastructure_queried": True}})
+        # §3 tenant SQL workload (RED) via the shared layer — matches the logical report.
         workload_ids = [c for c in ("SQL-01", "SQL-02", "SQL-03", "SQL-05", "SQL-06",
                                     "SQLD-01", "SQLD-02", "SQLD-03") if c in selected_ids]
         if workload_ids:
             try:
                 wl_cur, workload_prev, workload_prev_window = _collect_workload(
-                    ClinicAPI(args.env_file), cluster_id, args, workload_ids)
-                bound_ids = {b["check_id"] for b in bound}
-                bound += [r for r in wl_cur if r["check_id"] not in bound_ids]
+                    api, cluster_id, args, workload_ids)
+                for r in wl_cur:
+                    by_id.setdefault(r["check_id"], r)
             except Exception:  # fail-closed: workload stays N/A, run continues
                 workload_prev = {}
                 workload_prev_window = None
-        # Binding收口 (2026-11-25): the native recipe/adapter layer is now the
-        # AUTHORITATIVE source for all 23 bound dedicated checks (guardrail-verified at
-        # zero hard diff, same-window monolith baseline). dedicated_binding is retained
-        # only as (a) the SCOPE-01/04/08 source and (b) the error-path fallback — the
-        # monolith still runs for the overall verdict floor + metadata, so its bound
-        # results stay available for free until monolith retirement. The merge is
-        # native-primary and add-based: native wins for the checks it owns, and the
-        # monolith's binding fills any check native did not produce (robust to a
-        # per-check native gap, not only a whole-run failure).
-        # The native set is data-driven (recipes flagged dedicated_native, via
-        # native_dedicated_checks()) unless NATIVE_DEDICATED_ADAPTER_CHECKS is set in the
-        # environment — a comma list (empty = pure monolith) — which lets the golden
-        # guardrail capture a same-window monolith baseline without a code edit.
-        _env_native = os.environ.get("NATIVE_DEDICATED_ADAPTER_CHECKS")
-        _native_set = ([c.strip() for c in _env_native.split(",") if c.strip()]
-                       if _env_native is not None else list(native_dedicated_checks()))
-        native_ids = [c for c in _native_set if c in selected_ids]
-        if native_ids:
-            try:
-                overview_md = {k: report.get(k) for k in ("provider", "region", "version", "status")}
-                native = _collect_native_dedicated(ClinicAPI(args.env_file), cluster_id, args,
-                                                   native_ids, metadata=overview_md)
-                by_id = {b["check_id"]: b for b in bound}  # monolith binding = fallback/SCOPE
-                by_id.update(native)                       # native authoritative for the 23
-                bound = list(by_id.values())
-            except Exception:  # fail-closed: keep the monolith's result on error
-                pass
-    metadata = {
-        "provider": report.get("provider"),
-        "region": report.get("region"),
-        "version": report.get("version"),
-        "status": report.get("status"),
-    }
-    # §7 authorized feature inventory from the Clinic cluster detail (fail-closed).
-    metadata.update({k: v for k, v in _fetch_cluster_detail(ClinicAPI(args.env_file), cluster_id).items()
-                     if k == "feature_gates"})
-    # §5.4 execution-plan health: plan-cache hit rate collected above.
-    plan_cache = (report.get("metrics") or {}).get("plan_cache_hit_pct")
-    if isinstance(plan_cache, (int, float)):
-        metadata["plan_cache_hit_pct"] = plan_cache
+    except Exception:  # fail-closed: engine synthesizes N/A for every selected check
+        by_id = {}
+    bound = list(by_id.values())
+
+    md = dict(overview)
+    # §7 authorized feature inventory + §5.4 plan-cache hit rate (both fail-closed).
+    md.update({k: v for k, v in _fetch_cluster_detail(api, cluster_id).items() if k == "feature_gates"})
+    plan_cache = _fetch_plan_cache_hit_pct(api, cluster_id, window)
+    if plan_cache is not None:
+        md["plan_cache_hit_pct"] = plan_cache
+
     raw = {
         "cluster_id": str(cluster_id),
-        "cluster_name": report.get("cluster_name") or str(cluster_id),
-        "metadata": metadata,
+        "cluster_name": cluster_name,
+        "metadata": md,
         "plan": plan,
-        "collector": "dedicated_health_inspection",
-        "window": report.get("window") or {},
+        "collector": "native_full_stack",
+        "window": window.evidence(),
         "check_results": bound,
-        "verdict": report.get("verdict"),
-        "findings": report.get("findings"),
-        "unknown_checks": report.get("unknown_checks"),
-        "analysis": report.get("analysis"),
     }
     normalized = evaluate(raw, selection)
-    # Overall status is the worse of the collector's verdict and the engine's
-    # worst bound check — the binding may only RAISE severity, never mask it.
-    normalized["status"] = worse_status(verdict_to_status(report.get("verdict")), normalized.get("status") or "N/A")
-    # Respect the engine's N/A-aware confidence; collection failures only lower it.
-    engine_confidence = normalized.get("confidence") or "LOW"
-    normalized["confidence"] = "MEDIUM" if (report.get("unknown_checks") and engine_confidence == "HIGH") else engine_confidence
-    normalized["overall_status_source"] = "max(collector_verdict, engine)"
+    normalized["overall_status_source"] = "engine_worst_of_checks"
     normalized["lang"] = getattr(args, "lang", "zh")
     if workload_prev:
         normalized["previous_period"] = workload_prev  # §3 workload trend
     if workload_prev_window:
         normalized["previous_window"] = workload_prev_window  # §3 period-range note
-
-    # The collector's Feishu report is an internal artifact, not the customer
-    # report. The customer report is rendered from canonical check_results.
-    raw["internal_report_markdown"] = str(report.get("markdown") or "")
     customer_report = render_health_report(normalized)
     return raw, normalized, customer_report
 
@@ -547,7 +472,7 @@ def inspect_one(api: ClinicAPI, cluster_id: str, args: argparse.Namespace, outpu
     if plan in LOGICAL_PLANS:
         raw, normalized, report = collect_logical(api, metadata, cluster_id, plan, args)
     else:
-        raw, normalized, report = collect_full_stack(cluster_id, plan, args)
+        raw, normalized, report = collect_full_stack(metadata, cluster_id, plan, args)
 
     # Privacy gate BEFORE anything touches disk: an unsafe customer report must not
     # be written (a later reader/publisher could pick it up). Raises on any leak.
