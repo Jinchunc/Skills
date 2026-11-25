@@ -113,6 +113,14 @@ TIDB-01/02    TIKV-01/02/03/04/05/06/07/08/09/10
      至此 collect_full_stack 的"硬编码"尾巴基本清空:选什么(applicability)、怎么采(recipe)、是否 native
      (dedicated_native)、能力(plan_capabilities)全在 config。剩余耦合仅巨石本体(verdict 底线/metadata),属第 4 步退役。
 
+   - ✅ **CDC 活跃路径护栏已补（2026-11-25,退役前置）**：`tests/test_dedicated_cdc_parity.py` 给同一份合成
+     changefeed 数据同时喂 native adapter 与巨石 `bind_dedicated_results`,逐分支断言 status+evidence_keys 一致
+     (CDC-01 八分支 no_metric/empty/all_working/failed/errored/stopped/not_all_working;CDC-02 七分支 N/A/below/
+     warn/critical+边界),全零差异。**证明退役巨石不改 CDC 行为**(native 忠实复刻 binding),是退役的充分护栏。
+     **残留(与退役无关)**:binding 的状态名假设 `Total/Working/Failed/Error/Stopped` 与真实
+     `ticdc_coordinator_changefeed_state` 的 `state` 标签是否一致,本集群无 changefeed(TiCDC 指标全空)无法确认——
+     既有设计、native 只复刻,退役前后一致;确认真实语义需带 changefeed 集群,属独立正确性问题。198 测试绿。
+
    这些就是 by-instance 聚合，和 shared 的 `promql_distribution` 最像；再 CDC-01/02（changefeed 状态/滞后）、
    AVL-01/02/08（可用性/重启/拓扑）、TIKV-03..10（吞吐/稳定性/错误信号/响应性等）。
    每搬一个：把巨石里的 PromQL 抄进 recipe、接通用或新 adapter、`dedicated_binding` 里该 check 改为"已原生采集、

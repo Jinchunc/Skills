@@ -31,7 +31,7 @@
 
 ## 3. 清单（23 项 · 全部保留）
 
-**native 列**：✅ 已 native 化并护栏零硬差异 ｜ ✅\* native 化、仅 N/A 路径护栏验证（活跃路径已忠实搬移，待带 changefeed 集群验证）｜ ⏳ 待 native
+**native 列**：✅ 已 native 化并护栏零硬差异 ｜ ✅\* native 化;N/A 路径实测护栏 + 活跃路径 native↔binding 形状护栏（单测,全分支零差异）;真实 TiCDC 标签语义待带 changefeed 集群确认（与退役无关,见 §3）｜ ⏳ 待 native
 
 | # | Cat | Check | 基础信号（客户报告展示） | 指标族 | 阈值 | 等级 | native |
 |---|---|---|---|---|---|---|---|
@@ -59,11 +59,13 @@
 | 22 | 11 TiCDC | CDC-01 | changefeed 状态 | ticdc changefeed state | failed→WARN / 非全 W→NOTICE | WARNING / NOTICE | ✅\* |
 | 23 | 11 TiCDC | CDC-02 | checkpoint/resolved 滞后峰值 | ticdc checkpoint lag | 300 / 3600s | WARNING / CRITICAL | ✅\* |
 
-**统计（2026-11-25）**：✅ **23 项全部 native 化**，同窗口（11-18→11-25）护栏对巨石基线**零硬差异（含零软提示）**。其中 **21 项路径已被护栏实测验证**；**CDC-01/02 仅 N/A 路径被验证**（本集群无 changefeed，活跃路径已忠实搬移但未实测，见下）。
+**统计（2026-11-25）**：✅ **23 项全部 native 化**，同窗口（11-18→11-25）护栏对巨石基线**零硬差异（含零软提示）**。其中 **21 项路径已被实测护栏验证**；**CDC-01/02**:N/A 路径实测护栏 + **活跃路径 native↔binding 形状护栏（`tests/test_dedicated_cdc_parity.py`,CDC-01 八分支 / CDC-02 七分支全零差异）**——即退役巨石不改 CDC 行为。唯一残留是真实 TiCDC 标签语义（见下,与退役无关）。
 
 **本轮补搬（2026-11-25，TIKV-08 / CDC-01 / CDC-02）**：
 - **TIKV-08**（错误信号）：**完整 native 化并实测验证**。新增 `tikv_error_signals` adapter：4 条 PromQL 计数总增量（`tikv_critical_error_total` / `tikv_channel_full_total` / `tikv_server_report_failure_msg_total` / `tikv_grpc_msg_fail_total`）+ `error_log_count`（新增 `ClinicAPI.loki_query_range` + 复刻巨石 TiKV ERROR/FATAL 日志过滤器，fail-closed→0）。本集群基线即 WARNING/5 键，native 产出**完全一致**（WARNING + 同 5 键）。日志采集通道已落在 adapter 层，不再依赖巨石。
-- **CDC-01/02**（changefeed 状态/滞后）：源其实清晰（`ticdc_coordinator_changefeed_state` 按 `state` 聚合；`ticdc_dispatchermanager_checkpoint_ts_lag` / `..._resolved_ts_lag` 取峰值），已搬成 `changefeed_state_check` / `combined_scalar_threshold` adapter，CDC-02 新增 `cdc_checkpoint_lag_s` 规则（300/3600s）。**局限（如实标注）**：验证集群 `10698648422638660035` 无 changefeed，护栏只覆盖 N/A 路径；**活跃路径（WARNING/NOTICE/CRITICAL 判定）照绑定逻辑忠实搬移、单测覆盖，但未在真实带 changefeed 集群实测**——这是 `✅*` 的含义。待有带 changefeed 的 Dedicated 集群再补一次护栏即可去星。
+- **CDC-01/02**（changefeed 状态/滞后）：源清晰（`ticdc_coordinator_changefeed_state` 按 `state` 聚合；`ticdc_dispatchermanager_checkpoint_ts_lag` / `..._resolved_ts_lag` 取峰值），已搬成 `changefeed_state_check` / `combined_scalar_threshold` adapter，CDC-02 新增 `cdc_checkpoint_lag_s` 规则（300/3600s）。
+  - **活跃路径护栏（已补,2026-11-25）**：`tests/test_dedicated_cdc_parity.py` 给**同一份合成 changefeed 数据**同时喂 native adapter 与巨石 `bind_dedicated_results`,逐分支断言**形状（status+evidence_keys）一致**——CDC-01 覆盖 no_metric/empty/all_working/failed/errored/stopped/not_all_working,CDC-02 覆盖 N/A/below_warn/warn/critical+边界。全零差异。**这证明:退役巨石不改变 CDC 行为**(native 忠实复刻 binding),是退役的充分护栏。
+  - **残留（如实,与退役无关）**:binding 的状态名假设是 `Total/Working/Failed/Error/Stopped`,而 `ticdc_coordinator_changefeed_state` 真实 `state` 标签值在本集群**无法确认**(无 changefeed、TiCDC 指标全空)。若真实标签与此不符,活跃定级可能是惰性的——但这是**既有设计、native 只是忠实复刻**,退役前后一样,不因退役变差。要确认/修正真实语义,需一个带 changefeed 的 Dedicated 集群实跑一次;那是独立的正确性问题,不是退役前置。
 
 ---
 
@@ -104,10 +106,10 @@
 
 ## 6. 退役路线（23 项已全部 native → 收口 → 删巨石）
 
-1. ✅ **23 项全部 native 化**（2026-11-25）：PromQL/Loki 已抄进 `collection.v1.json` recipe + 通用/专用 adapter，`health_inspection.NATIVE_DEDICATED_ADAPTER_CHECKS` 全覆盖（可回滚），同窗口护栏零硬差异。**唯一未实测**：CDC-01/02 活跃路径（本集群无 changefeed）——见 §3。
+1. ✅ **23 项全部 native 化**（2026-11-25）：PromQL/Loki 已抄进 `collection.v1.json` recipe + 通用/专用 adapter，native 集合数据驱动（recipe `dedicated_native` 标志），同窗口护栏零硬差异。**CDC-01/02 活跃路径护栏已补**（native↔binding 形状全分支零差异,见 §3）——退役不改 CDC 行为。真实 TiCDC 标签语义是独立残留（与退役无关）。
 2. ✅ **稳妥收口已落地**（2026-11-25）：`collect_full_stack` 合并改为 **native-primary add-based**（native 对 23 项权威、稳健回退），`dedicated_binding` 降级为「SCOPE + 错误回退 + verdict 透传」（23 项推导留作可回滚 fallback）。巨石 `inspect_cluster` 仍为 verdict 底线/metadata 运行（其移除属第 3 步）。golden compare 23 项**零硬差异**。详见 [`dedicated-migration-plan.md`](dedicated-migration-plan.md) §分阶段-3。
    - ✅ **收口中暴露并已修复一处既有 gate bug（与收口无关）**：旧 `inspection_gate.derive_status` 只读顶层 `verdict`、忽略 check_results 更高严重度；当租户 SQL 等非-verdict check 超过巨石 verdict 时 `gate_consistent` 判 False、`inspect` 退非零（状态被低报隐患）。新增 `_report_status`（verdict + check_results worst-of，排除 N/A，与 engine 口径一致），+2 gate 单测。详见 [`dedicated-migration-plan.md`](dedicated-migration-plan.md) §分阶段-3。
-3. **退役巨石**：确认无引用（含 `[INTERNAL]` CLI、`internal-report.md` 生成、Loki 日志扫描现已在 `ClinicAPI.loki_query_range`）后删除 `dedicated_health_inspection.py` + 绑定；metadata 改从 Clinic 详情 API 直取。**门槛**：先补 CDC-01/02 活跃路径护栏去星,再退役。
+3. **退役巨石**：确认无引用（含 `[INTERNAL]` CLI、`internal-report.md` 生成、Loki 日志扫描现已在 `ClinicAPI.loki_query_range`）后删除 `dedicated_health_inspection.py` + 绑定；metadata 改从 Clinic 详情 API 直取。**退役护栏已就绪**:23 项 golden 零硬差异 + CDC 活跃路径 native↔binding 形状护栏。巨石还提供 verdict 底线/metadata/binding 回退,退役需同时把这三者替换(verdict 改 native worst-of、metadata 走 Clinic 详情 API),属一次有语义取舍的改动。
 
 **不变量**（每步守住）：诚实 N·A、按 plan 容错沿用 shared 回退、护栏绿 + 全量单测绿 + 真实 Dedicated 抽验、每组可回滚。
 
