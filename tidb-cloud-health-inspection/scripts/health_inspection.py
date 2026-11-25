@@ -42,20 +42,14 @@ def write_json(path: Path, value: Any) -> None:
     atomic_write(path, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
 
 
-def logical_capabilities() -> frozenset[str]:
-    return frozenset(
-        {
-            "component.scope",
-            "component.overview",
-            "component.sql",
-            "component.resource_control",
-            "component.logical_storage",
-            "component.availability",
-            # The runner always collects an equal-duration previous window, so the
-            # comparable-window capability LST-03 gates on is satisfied.
-            "check.lst-03",
-        }
-    )
+def plan_capabilities(registry: dict[str, Any], plan: str) -> frozenset[str]:
+    """Capability aliases granted to a Plan — which component families it may probe,
+    plus any per-check grants (e.g. ``check.lst-03``: the runner always collects an
+    equal-duration previous window, so LST-03's comparable-window gate is satisfied).
+    Read from checklist.v1.json's ``plan_capabilities`` map: data-driven, so adjusting
+    a Plan's probe scope needs no code change. Unknown/missing Plan → empty (deny)."""
+    caps = (registry.get("plan_capabilities") or {}).get(plan) or []
+    return frozenset(caps)
 
 
 def _fetch_cluster_detail(api: ClinicAPI, cluster_id: str) -> dict[str, Any]:
@@ -119,7 +113,7 @@ def collect_logical(
             profile=args.profile,
             target_scope="individual_cluster",
             component=None,
-            capabilities=logical_capabilities(),
+            capabilities=plan_capabilities(registry, plan),
         ),
     )
     recipes = load_recipes()
@@ -179,19 +173,6 @@ _SEVERITY_RANK = {"N/A": -1, "HEALTHY": 0, "NOTICE": 1, "WARNING": 2, "CRITICAL"
 def worse_status(a: str, b: str) -> str:
     """Return the more severe of two statuses (N/A is least severe)."""
     return a if _SEVERITY_RANK.get(a, -1) >= _SEVERITY_RANK.get(b, -1) else b
-
-
-def dedicated_capabilities() -> frozenset[str]:
-    return frozenset(
-        {
-            "component.scope",
-            "component.overview",
-            "component.tikv",
-            "component.pd",
-            "component.infrastructure",
-            "component.availability",
-        }
-    )
 
 
 def _collect_reliability(client: Any, cluster_id: str, window: Any) -> dict[str, Any]:
@@ -361,7 +342,7 @@ def collect_full_stack(
             profile=args.profile,
             target_scope="individual_cluster",
             component=None,
-            capabilities=dedicated_capabilities(),
+            capabilities=plan_capabilities(registry, plan),
         ),
     )
     # Bind only within the registry selection so a registry/capability change can
@@ -493,7 +474,8 @@ def run_gate(
     ]
     if args.registry:
         command.extend(["--registry", args.registry])
-    for capability in sorted(logical_capabilities() if plan in LOGICAL_PLANS else frozenset()):
+    _gate_registry = load_registry(args.registry) if args.registry else load_registry()
+    for capability in sorted(plan_capabilities(_gate_registry, plan) if plan in LOGICAL_PLANS else frozenset()):
         command.extend(["--capability", capability])
     completed = subprocess.run(command, text=True, capture_output=True, check=False)
     if completed.returncode != 0:

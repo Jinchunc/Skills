@@ -104,6 +104,15 @@ TIDB-01/02    TIKV-01/02/03/04/05/06/07/08/09/10
      `applicability` 数据驱动选集同一思路。env 开关 `NATIVE_DEDICATED_ADAPTER_CHECKS`（空=纯巨石）仍可运行时覆盖供护栏用。
      派生集合与原 23 项完全一致,护栏零硬差异。
 
+   - ✅ **Plan 能力集合改为数据驱动（2026-11-25）**：去掉 `dedicated_capabilities()` / `logical_capabilities()`
+     硬编码函数,在 `config/checklist.v1.json` 顶层新增 `plan_capabilities` 映射(每个 Plan → 能力别名列表,
+     即该 Plan 可探测的 component 家族 + 个别 per-check 授权如 `check.lst-03`)。新 `plan_capabilities(registry, plan)`
+     从中读取(缺失=空=拒绝)。`collect_logical` / `collect_full_stack` / `run_gate` 三处调用改为按 plan 取。
+     **调整某 Plan 的探测范围不再改代码**,与 checklist `applicability`、recipe `dedicated_native` 同为数据驱动。
+     派生能力集与选集(Dedicated 86 项、Premium 45 项)与改前逐一致,护栏零硬差异。
+     至此 collect_full_stack 的"硬编码"尾巴基本清空:选什么(applicability)、怎么采(recipe)、是否 native
+     (dedicated_native)、能力(plan_capabilities)全在 config。剩余耦合仅巨石本体(verdict 底线/metadata),属第 4 步退役。
+
    这些就是 by-instance 聚合，和 shared 的 `promql_distribution` 最像；再 CDC-01/02（changefeed 状态/滞后）、
    AVL-01/02/08（可用性/重启/拓扑）、TIKV-03..10（吞吐/稳定性/错误信号/响应性等）。
    每搬一个：把巨石里的 PromQL 抄进 recipe、接通用或新 adapter、`dedicated_binding` 里该 check 改为"已原生采集、

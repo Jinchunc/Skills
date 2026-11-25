@@ -10,6 +10,51 @@
     "BYOC",
     "Unknown"
   ],
+  "plan_capabilities": {
+    "Starter": [
+      "component.scope",
+      "component.overview",
+      "component.sql",
+      "component.resource_control",
+      "component.logical_storage",
+      "component.availability",
+      "check.lst-03"
+    ],
+    "Essential": [
+      "component.scope",
+      "component.overview",
+      "component.sql",
+      "component.resource_control",
+      "component.logical_storage",
+      "component.availability",
+      "check.lst-03"
+    ],
+    "Premium": [
+      "component.scope",
+      "component.overview",
+      "component.sql",
+      "component.resource_control",
+      "component.logical_storage",
+      "component.availability",
+      "check.lst-03"
+    ],
+    "Dedicated": [
+      "component.scope",
+      "component.overview",
+      "component.tikv",
+      "component.pd",
+      "component.infrastructure",
+      "component.availability"
+    ],
+    "BYOC": [
+      "component.scope",
+      "component.overview",
+      "component.tikv",
+      "component.pd",
+      "component.infrastructure",
+      "component.availability"
+    ]
+  },
   "profiles": [
     "health",
     "component_deep_dive"
